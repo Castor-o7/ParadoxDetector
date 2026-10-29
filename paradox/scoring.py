@@ -23,6 +23,9 @@ Paradox score (0-100), in plain terms:
    mentions of these IPs usually come from reports listing every address the
    malware contacted (GitHub, Microsoft, CDNs), so OTX counts at half weight.
    Direct attack evidence (abuse reports, sensor hits) is unaffected.
+   Forged identity: an IP whose reverse DNS names a known operator (Shodan,
+   Googlebot...) that does not resolve back is wearing a costume anyone can
+   sew. It counts as a veneer, and sets a "Suspicious" threat floor.
 5. Neighborhood cover: the IP's own evidence looks clean but its /24 or its
    network (ASN) is dirty. Attackers rotate through adjacent addresses and
    rent from bulletproof hosts, so the gap between surroundings and the IP
@@ -54,8 +57,10 @@ VENEER_MIN_CONFIDENCE = 0.5
 VENEER_FRESH_DAYS = 30
 VENEER_WEIGHT = 0.25
 NETWORK_WEIGHT = 0.2
-SCAN_EXPLAINED_SHARE = 0.6
-SHARED_INFRA_OTX_FACTOR = 0.5  # OTX on CDN/RIOT addresses: mostly "malware contacted this"    # evidence this scan-dominated is what a scanner label predicts
+SCAN_EXPLAINED_SHARE = 0.6     # evidence this scan-dominated is what a scanner label predicts
+SHARED_INFRA_OTX_FACTOR = 0.5  # OTX on CDN addresses: mostly "malware contacted this"
+SPOOF_STRENGTH = 0.6           # veneer strength of a forged reverse-DNS identity
+SPOOF_THREAT_FLOOR = 0.3       # forging an identity is suspicious on its own, but not proof
 HOSTING_DISCOUNT = 0.5
 NETWORK_THREAT_FACTOR = 0.5   # guilt by association lifts threat, but only so far
 
@@ -213,6 +218,12 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     signals, scanner = explain_scanning(signals)
     signals, shared = shared_infrastructure(signals)
     veneer = detect_veneer(signals, now)
+    spoofed = [s.facts["spoofed_identity"] for s in signals
+               if s.status == "ok" and s.facts.get("spoofed_identity")]
+    if spoofed:
+        veneer.update(active=True, strength=max(veneer["strength"], SPOOF_STRENGTH),
+                      contradicted_by=veneer["contradicted_by"] + spoofed)
+    veneer["spoofed"] = spoofed
     if veneer["active"]:
         signals = [replace(s, confidence=s.confidence * 0.5)
                    if s.facts.get("benign_label") and (s.threat or 0) < 0.2 else s
@@ -245,6 +256,8 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
               + NETWORK_WEIGHT * network["cover"])
     paradox = round(100 * raw * (0.4 + 0.6 * coverage), 1)
     threat = max(threat, NETWORK_THREAT_FACTOR * network["risk"])
+    if spoofed:
+        threat = max(threat, SPOOF_THREAT_FLOOR)
 
     if gap > 0.1:
         direction = "emerging"
@@ -257,7 +270,9 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     else:
         direction = "aligned"
         explanation = "Fast and slow beacons broadly agree."
-    if veneer["active"]:
+    if spoofed:
+        explanation += " Its reverse DNS claims an identity that does not check out: a forged label."
+    elif veneer["active"]:
         explanation += " A trusted reputation label may be providing cover."
     elif scanner["explained"]:
         explanation += (f" {scanner['label']} identifies a known scanner; reports that are mostly "

@@ -5,6 +5,7 @@ silently drift.
 """
 
 import json
+import socket
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -120,6 +121,44 @@ class CalibrationTests(unittest.TestCase):
         # .2 is on Feodo and .3 is in DROP (direct score inputs), 46.1.1.4 is on only
         # one list, and 10.0.0.1 is private - only 45.1.1.1 is a fair label.
         self.assertEqual(picked, ["45.1.1.1"])
+
+
+class ReverseDnsTests(unittest.TestCase):
+    def rdns(self, ip, ptr, forward):
+        def addr(host, *_):
+            return (ptr, [], [ip]) if ptr else (_ for _ in ()).throw(socket.herror(1, "none"))
+        sig = Signal(source="rdns", name="rdns", tier="context")
+        with mock.patch.object(sources.socket, "gethostbyaddr", side_effect=addr), \
+             mock.patch.object(sources.socket, "getaddrinfo",
+                               return_value=[(2, 1, 6, "", (a, 0)) for a in forward]):
+            sources.check_rdns(ip, sig)
+        return sig
+
+    def test_forward_confirmed_scanner_is_a_scanner_label(self):
+        sig = self.rdns("71.6.135.131", "soda.census.shodan.io", ["71.6.135.131"])
+        self.assertEqual(sig.facts["label_kind"], "scanner")
+        self.assertIn("Shodan", sig.facts["benign_label"])
+        self.assertNotIn("spoofed_identity", sig.facts)
+
+    def test_claim_that_does_not_resolve_back_is_forged(self):
+        sig = self.rdns("45.1.1.1", "census9.shodan.io", ["198.20.69.74"])
+        self.assertIn("does not resolve back", sig.facts["spoofed_identity"])
+        self.assertNotIn("benign_label", sig.facts)
+
+    def test_lookalike_domain_claims_nothing(self):
+        sig = self.rdns("45.1.1.1", "crawl.googlebot.com.evil.example", ["45.1.1.1"])
+        self.assertNotIn("claim", sig.facts)
+        self.assertEqual(sources.claimed_identity("notshodan.io"), None)
+
+    def test_no_ptr(self):
+        sig = self.rdns("45.1.1.1", None, [])
+        self.assertEqual(sig.summary, "No reverse DNS")
+
+    def test_slow_resolver_is_a_beacon_error(self):
+        sig = Signal(source="rdns", name="rdns", tier="context")
+        with mock.patch.object(sources, "_resolve", side_effect=sources.FuturesTimeout()), \
+             self.assertRaises(sources.BeaconError):
+            sources.check_rdns("45.1.1.1", sig)
 
 if __name__ == "__main__":
     unittest.main()
