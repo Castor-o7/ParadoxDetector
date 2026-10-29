@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paradox Detector</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #14171f; --muted: #5d6573; --line: #e2e5ea;
+  --accent: #3b5bdb; --fast: #d9480f; --slow: #1971c2; --ok: #2b8a3e; --warn: #e67700; --bad: #c92a2a;
+  --track: #e9ecef; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1016; --panel: #151a23; --ink: #e8ebf0; --muted: #8b94a5; --line: #252c38;
+    --accent: #748ffc; --fast: #e8590c; --slow: #339af0; --ok: #51cf66; --warn: #fcc419; --bad: #ff6b6b;
+    --track: #232a36;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 28px 16px 64px; }
+header h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+header p { margin: 4px 0 20px; color: var(--muted); max-width: 70ch; }
+form { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+input[type=text] { flex: 1 1 260px; padding: 11px 14px; font: 16px var(--mono); color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button { padding: 11px 18px; font: 600 14px system-ui, sans-serif; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+button.ghost { background: transparent; color: var(--accent); }
+button:disabled { opacity: .55; cursor: progress; }
+.examples { color: var(--muted); font-size: 13px; margin: -14px 0 24px; }
+.examples a { color: var(--accent); cursor: pointer; font-family: var(--mono); margin-right: 10px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.grid { display: grid; gap: 16px; }
+.hero { grid-template-columns: 260px 1fr; align-items: center; }
+@media (max-width: 720px) { .hero { grid-template-columns: 1fr; } }
+.gauge { text-align: center; }
+.gauge .num { font: 700 44px/1 var(--mono); }
+.gauge .lbl { font-weight: 600; margin-top: 4px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+  border: 1px solid currentColor; }
+.tiers { display: grid; gap: 14px; }
+.tierrow { display: grid; grid-template-columns: 110px 1fr 48px; gap: 10px; align-items: center; }
+.tierrow .name { font-weight: 600; font-size: 13px; }
+.meter { height: 10px; background: var(--track); border-radius: 99px; overflow: hidden; }
+.meter > span { display: block; height: 100%; border-radius: 99px; }
+.val { font: 600 13px var(--mono); text-align: right; }
+.explain { margin: 4px 0 0; color: var(--muted); }
+.veneer { border: 1px solid var(--bad); border-left-width: 4px; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.veneer b { color: var(--bad); }
+.veneer ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.veneer.quiet { border-color: var(--line); border-left-color: var(--ok); color: var(--muted); }
+.veneer.quiet b { color: var(--ok); }
+.stats { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--ink); font-family: var(--mono); }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 28px 0 10px; }
+h2 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.cards { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.card { padding: 16px; }
+.card .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.card .title { font-weight: 600; }
+.card .title a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.card .score { font: 700 15px var(--mono); }
+.card .sum { margin: 6px 0 8px; }
+.card .meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+.card ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.card ul li { word-break: break-word; }
+.card.dim { opacity: .65; }
+.narr { margin-top: 28px; }
+.hist { margin-top: 16px; }
+.hist .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.hist .lag { color: var(--muted); font-size: 14px; margin: 4px 0 10px; }
+.hist .lag b { color: var(--ink); }
+.legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: 3px; margin-right: 6px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px system-ui, sans-serif; fill: var(--muted); }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  white-space: nowrap; transform: translate(-50%, -100%); display: none; }
+.tip div { display: flex; justify-content: space-between; gap: 14px; }
+.tip b { font-family: var(--mono); }
+.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+table.scans { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+table.scans th, table.scans td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+table.scans td.n { font-family: var(--mono); text-align: right; }
+details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 10px; }
+.narr .body p:first-child { margin-top: 0; }
+.modes { display: flex; gap: 4px; margin-bottom: 14px; }
+.modes button { padding: 6px 14px; font-size: 13px; background: transparent; color: var(--muted); border-color: var(--line); }
+.modes button[aria-pressed=true] { color: var(--ink); border-color: var(--accent); }
+.logform { display: grid; gap: 10px; margin-bottom: 24px; }
+.logform textarea { width: 100%; min-height: 150px; padding: 11px 14px; font: 13px/1.45 var(--mono); color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+.logform textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.logform .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.logform input[type=number] { width: 70px; padding: 6px 8px; font: 13px var(--mono); color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.progress { height: 6px; background: var(--track); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+.progress > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
+table.logres { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+table.logres th, table.logres td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.logres td.n { font-family: var(--mono); text-align: right; white-space: nowrap; }
+table.logres td.ip a { font-family: var(--mono); color: var(--accent); cursor: pointer; }
+table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tablewrap { overflow-x: auto; }
+.err { color: var(--bad); }
+.empty { color: var(--muted); text-align: center; padding: 48px 16px; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cyber Security Paradox Detector</h1>
+    <p>Compares fast-updating threat beacons (live pulses, sensors, botnet trackers) with slow-updating ones
+      (curated blocklists, vendor consensus, scan data). A high paradox score means the fast beacons see a
+      threat the slow ones haven't caught up with yet.</p>
+  </header>
+
+  <div class="modes" role="group" aria-label="Mode">
+    <button type="button" id="m-ip" aria-pressed="true">Single IP</button>
+    <button type="button" id="m-log" aria-pressed="false">Scan a log</button>
+  </div>
+
+  <form id="f">
+    <input id="ip" type="text" placeholder="Enter a public IPv4 or IPv6 address" autocomplete="off" spellcheck="false" required>
+    <button id="go" type="submit">Scan</button>
+  </form>
+  <div class="examples">Try:
+    <a data-ip="45.155.205.233">45.155.205.233</a>
+    <a data-ip="185.220.101.1">185.220.101.1</a>
+    <a data-ip="8.8.8.8">8.8.8.8</a>
+  </div>
+
+  <form id="lf" class="logform" hidden>
+    <textarea id="logtext" placeholder="Paste log lines (web, SSH, firewall, JSON...) or choose a file. Every public IP is extracted; private addresses are skipped." spellcheck="false"></textarea>
+    <div class="row">
+      <input type="file" id="logfile" accept=".log,.txt,.csv,.json,.jsonl,text/*">
+      <label>Scan the <input type="number" id="loglimit" min="1" max="50" value="25"> most active IPs</label>
+      <button id="lgo" type="submit">Scan log</button>
+    </div>
+  </form>
+
+  <div id="out"><div class="panel empty">Enter an IP address to query the beacons.</div></div>
+</main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const threatColor = t => t == null ? "var(--muted)" : t < 0.15 ? "var(--ok)" : t < 0.4 ? "var(--warn)" : "var(--bad)";
+const paradoxColor = p => p < 15 ? "var(--ok)" : p < 35 ? "var(--warn)" : "var(--bad)";
+const pct = v => v == null ? "–" : Math.round(v * 100);
+let current = null;
+
+function gauge(value) {
+  const r = 80, c = Math.PI * r, frac = Math.max(0, Math.min(1, value / 100));
+  return `<svg viewBox="0 0 200 112" width="220" role="img" aria-label="Paradox score ${value} of 100">
+    <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--track)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="${paradoxColor(value)}" stroke-width="16"
+      stroke-linecap="round" stroke-dasharray="${c * frac} ${c}"/></svg>`;
+}
+
+function meter(v, color) {
+  return `<div class="meter"><span style="width:${v == null ? 0 : Math.max(2, v * 100)}%;background:${color}"></span></div>`;
+}
+
+function card(s) {
+  const scored = s.tier !== "context";
+  const dim = s.status !== "ok";
+  const title = s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name);
+  const score = !scored ? "" : s.status === "ok"
+    ? `<span class="score" style="color:${threatColor(s.threat)}">${pct(s.threat)}</span>`
+    : `<span class="tag" style="color:${s.status === "error" ? "var(--bad)" : "var(--muted)"}">${esc(s.status)}</span>`;
+  const meta = [];
+  if (scored && s.status === "ok") meta.push(`confidence ${pct(s.confidence)}%`);
+  if (s.last_seen) meta.push(`last seen ${esc(s.last_seen)}`);
+  if (s.latency_ms) meta.push(`${s.latency_ms} ms`);
+  return `<div class="panel card ${dim ? "dim" : ""}">
+    <div class="top"><span class="title">${title}</span>${score}</div>
+    ${scored && s.status === "ok" ? meter(s.threat, threatColor(s.threat)) : ""}
+    <div class="sum">${esc(s.summary)}</div>
+    <div class="meta">${meta.join("<span>·</span>")}</div>
+    ${s.evidence?.length ? `<ul>${s.evidence.slice(0, 6).map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
+function section(report, tier, label, color) {
+  const rows = report.signals.filter(s => s.tier === tier);
+  return `<h2><span class="dot" style="background:${color}"></span>${label}</h2>
+    <div class="grid cards">${rows.map(card).join("")}</div>`;
+}
+
+function veneerBox(v, scanner) {
+  if (!v?.labels?.length) return "";
+  if (!v.active && scanner?.explained?.length) return `<div class="veneer quiet"><b>Known scanner:</b> ${v.labels.map(esc).join("; ")}
+    <span>explains these reports, which are mostly scanning and were discounted:</span>
+    <ul>${scanner.explained.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+  if (!v.active) return `<div class="veneer quiet"><b>Benign label:</b> ${v.labels.map(esc).join("; ")}
+    <span>(not contradicted by fresh threat activity)</span></div>`;
+  return `<div class="veneer"><b>Reputation veneer</b>: ${v.labels.map(esc).join("; ")} vouches for this IP, but these beacons report fresh threat activity:
+    <ul>${v.contradicted_by.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+}
+
+function render(r) {
+  const sc = r.score;
+  const dirText = {emerging: "Emerging threat", stale: "Stale reputation", aligned: "Aligned"}[sc.direction];
+  $("#out").innerHTML = `
+    <div class="grid hero panel">
+      <div class="gauge">${gauge(sc.paradox)}
+        <div class="num" style="margin-top:-46px">${sc.paradox.toFixed(0)}</div>
+        <div class="lbl" style="color:${paradoxColor(sc.paradox)}">${esc(sc.paradox_label)}</div>
+      </div>
+      <div class="tiers">
+        <div><span class="tag" style="color:${sc.direction === "aligned" ? "var(--muted)" : "var(--accent)"}">${dirText}</span>
+          <span style="font-family:var(--mono);margin-left:8px">${esc(r.ip)}</span>
+          <p class="explain">${esc(sc.explanation)}</p></div>
+        ${veneerBox(sc.veneer, sc.scanner)}
+        <div class="tierrow"><span class="name" style="color:var(--fast)">Fast beacons</span>${meter(sc.fast.score, "var(--fast)")}<span class="val">${pct(sc.fast.score)}</span></div>
+        <div class="tierrow"><span class="name" style="color:var(--slow)">Slow beacons</span>${meter(sc.slow.score, "var(--slow)")}<span class="val">${pct(sc.slow.score)}</span></div>
+        <div class="tierrow"><span class="name">Overall threat</span>${meter(sc.threat, threatColor(sc.threat))}<span class="val">${pct(sc.threat)}</span></div>
+        <div class="stats">
+          <span>Verdict <b style="color:${threatColor(sc.threat)}">${esc(sc.threat_label)}</b></span>
+          <span>Coverage <b>${pct(sc.coverage)}%</b></span>
+          <span>Disagreement <b>${pct(sc.dispersion)}%</b></span>
+          ${sc.freshest_fast_evidence_days != null ? `<span>Freshest hit <b>${sc.freshest_fast_evidence_days}d ago</b></span>` : ""}
+          <span>Neighborhood risk <b>${pct(sc.network.risk)}</b>${sc.network.hosting ? " (hosting)" : ""}${sc.network.asn_drop ? ` <b style="color:var(--bad)">ASN-DROP</b>` : ""}</span>
+          <span>Independent sources <b>${sc.independence.independent} of ${sc.independence.beacons}</b></span>
+          <span>Scanned in <b>${(r.elapsed_ms / 1000).toFixed(1)}s</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="panel hist" id="hist"><span class="spinner"></span> Loading history…</div>
+    ${section(r, "fast", "Fast-updating beacons", "var(--fast)")}
+    ${section(r, "slow", "Slow-updating beacons", "var(--slow)")}
+    ${section(r, "network", "Neighborhood & network", "var(--muted)")}
+    ${section(r, "context", "Context", "var(--muted)")}
+    <div class="panel narr">
+      <div class="top" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <strong>Analyst summary</strong>
+        <button class="ghost" id="narrate">Generate with Claude</button>
+      </div>
+      <div class="body" id="narr" style="margin-top:10px;color:var(--muted)">Optional: asks Claude to explain the paradox and recommend next steps. Needs ANTHROPIC_API_KEY on the server.</div>
+    </div>`;
+  $("#narrate").onclick = narrate;
+  loadHistory(r.ip);
+}
+
+const fmtTime = iso => new Date(iso).toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+const SERIES = [{key: "fast", label: "Fast", color: "var(--fast)"}, {key: "slow", label: "Slow", color: "var(--slow)"}];
+
+function lagText(lag) {
+  if (lag.lag_days != null) return lag.lag_days >= 0
+    ? `Slow beacons caught up <b>${lag.lag_days} days</b> after the fast beacons first flagged this IP.`
+    : `Slow beacons flagged this IP <b>${-lag.lag_days} days</b> before the fast beacons did.`;
+  if (lag.open_days != null)
+    return `Fast beacons first flagged this IP <b>${lag.open_days} days</b> ago (in recorded scans); slow beacons have not caught up.`;
+  if (lag.first_slow_flag) return `Only slow beacons have flagged this IP in recorded scans.`;
+  return `No beacon has flagged this IP in recorded scans.`;
+}
+
+function historyChart(scans) {
+  const W = 760, H = 200, L = 34, R = 44, T = 10, B = 24;
+  const xs = scans.map(s => Date.parse(s.scanned_at));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), span = Math.max(1, x1 - x0);
+  const x = t => L + (t - x0) / span * (W - L - R);
+  const y = v => T + (1 - v) * (H - T - B);
+  const grid = [0, 0.5, 1].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>
+    <text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v * 100}</text>`).join("");
+  const ends = [];
+  const lines = SERIES.map(sr => {
+    let d = "", pen = "M";
+    const dots = [];
+    scans.forEach((s, i) => {
+      const v = s[sr.key];
+      if (v == null) { pen = "M"; return; }
+      d += `${pen}${x(xs[i]).toFixed(1)},${y(v).toFixed(1)} `; pen = "L";
+      dots.push(`<circle cx="${x(xs[i])}" cy="${y(v)}" r="4" fill="${sr.color}" stroke="var(--panel)" stroke-width="2"/>`);
+    });
+    const last = [...scans].reverse().find(s => s[sr.key] != null);
+    if (last) ends.push({label: sr.label, y: y(last[sr.key])});
+    return `<path d="${d}" fill="none" stroke="${sr.color}" stroke-width="2" stroke-linejoin="round"/>${dots.join("")}`;
+  }).join("");
+  if (ends.length === 2 && Math.abs(ends[0].y - ends[1].y) < 14) {   // keep end labels from colliding
+    const mid = (ends[0].y + ends[1].y) / 2, up = ends[0].y <= ends[1].y ? 0 : 1;
+    ends[up].y = mid - 7; ends[1 - up].y = mid + 7;
+  }
+  const labels = ends.map(e => `<text x="${W - R + 8}" y="${e.y + 4}">${e.label}</text>`).join("");
+  const axis = `<text x="${L}" y="${H - 4}">${fmtTime(scans[0].scanned_at)}</text>
+    <text x="${W - R}" y="${H - 4}" text-anchor="end">${fmtTime(scans.at(-1).scanned_at)}</text>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fast and slow beacon scores across ${scans.length} scans">
+    ${grid}${axis}${lines}${labels}
+    <line class="xh" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+    <rect class="hit" x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent"/></svg>
+    <div class="tip"></div></div>`;
+}
+
+function wireChart(box, scans) {
+  const svg = $("svg", box), tip = $(".tip", box), xh = $(".xh", box), hit = $(".hit", box);
+  if (!hit) return;
+  const xs = scans.map(s => Date.parse(s.scanned_at));
+  const vb = svg.viewBox.baseVal;
+  const L = +hit.getAttribute("x"), Wp = +hit.getAttribute("width");
+  const x0 = Math.min(...xs), span = Math.max(1, Math.max(...xs) - x0);
+  hit.addEventListener("pointermove", e => {
+    const rect = svg.getBoundingClientRect(), scale = rect.width / vb.width;
+    const px = (e.clientX - rect.left) / scale;
+    let i = 0, best = Infinity;
+    xs.forEach((t, j) => { const d = Math.abs(L + (t - x0) / span * Wp - px); if (d < best) { best = d; i = j; } });
+    const s = scans[i], cx = L + (xs[i] - x0) / span * Wp;
+    xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div style="margin-bottom:4px;color:var(--muted)">${esc(fmtTime(s.scanned_at))}</div>` +
+      SERIES.map(sr => `<div><span><i style="background:${sr.color}"></i>${sr.label}</span><b>${pct(s[sr.key])}</b></div>`).join("") +
+      `<div><span>Paradox</span><b>${s.paradox.toFixed(0)}</b></div>` +
+      `<div><span>Direction</span><span>${esc(s.direction)}${s.veneer ? " · veneer" : ""}</span></div>`;
+    tip.style.display = "block";
+    tip.style.left = `${cx * scale}px`; tip.style.top = `${10 * scale - 6}px`;
+  });
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); });
+}
+
+async function loadHistory(ip) {
+  const box = $("#hist");
+  try {
+    const res = await fetch(`/api/history?ip=${encodeURIComponent(ip)}`);
+    const {scans, lag} = await res.json();
+    const head = `<div class="head"><strong>History</strong>
+      ${scans.length > 1 ? `<div class="legend">${SERIES.map(sr => `<span><i style="background:${sr.color}"></i>${sr.label} beacons</span>`).join("")}</div>` : ""}</div>
+      <p class="lag">${scans.length} recorded scan${scans.length === 1 ? "" : "s"}. ${lagText(lag)}</p>`;
+    if (scans.length < 2) {
+      box.innerHTML = head + `<p class="lag">Scan this IP again later to see whether the slow beacons catch up.
+        To rescan every tracked IP on a schedule, run <code>python3 -m paradox --rescan-tracked</code> from cron.</p>`;
+      return;
+    }
+    const table = `<details><summary>Show table</summary><table class="scans"><thead><tr><th>Scanned</th>
+      <th>Paradox</th><th>Fast</th><th>Slow</th><th>Direction</th></tr></thead><tbody>${[...scans].reverse().map(s =>
+      `<tr><td>${esc(fmtTime(s.scanned_at))}</td><td class="n">${s.paradox.toFixed(0)}</td><td class="n">${pct(s.fast)}</td>
+       <td class="n">${pct(s.slow)}</td><td>${esc(s.direction)}${s.veneer ? " · veneer" : ""}</td></tr>`).join("")}</tbody></table></details>`;
+    box.innerHTML = head + historyChart(scans) + table;
+    wireChart(box, scans);
+  } catch (e) {
+    box.innerHTML = `<span class="err">Could not load history: ${esc(e.message)}</span>`;
+  }
+}
+
+function md(text) {
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`(.+?)`/g, "<code>$1</code>");
+  const out = []; let list = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const item = line.match(/^(?:[-*]|\d+\.)\s+(.*)/);
+    if (item) { (list ??= []).push(`<li>${inline(item[1])}</li>`); continue; }
+    if (list) { out.push(`<ul>${list.join("")}</ul>`); list = null; }
+    if (/^#+\s/.test(line)) out.push(`<p><strong>${inline(line.replace(/^#+\s/, ""))}</strong></p>`);
+    else if (line) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push(`<ul>${list.join("")}</ul>`);
+  return out.join("");
+}
+
+async function narrate() {
+  const btn = $("#narrate"), box = $("#narr");
+  btn.disabled = true; box.style.color = "var(--muted)";
+  box.innerHTML = `<span class="spinner"></span> Writing summary…`;
+  try {
+    const res = await fetch(`/api/narrate?ip=${encodeURIComponent(current)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    box.style.color = "var(--ink)"; box.innerHTML = md(data.narrative);
+  } catch (e) {
+    box.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  } finally { btn.disabled = false; }
+}
+
+async function scan(ip) {
+  const go = $("#go");
+  go.disabled = true;
+  $("#out").innerHTML = `<div class="panel empty"><span class="spinner"></span> Querying beacons for ${esc(ip)}…</div>`;
+  try {
+    const res = await fetch(`/api/scan?ip=${encodeURIComponent(ip)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    current = data.ip; render(data);
+    history.replaceState(null, "", `?ip=${encodeURIComponent(data.ip)}`);
+  } catch (e) {
+    $("#out").innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
+  } finally { go.disabled = false; }
+}
+
+function setMode(log) {
+  $("#m-ip").setAttribute("aria-pressed", !log); $("#m-log").setAttribute("aria-pressed", log);
+  $("#f").hidden = log; $(".examples").hidden = log; $("#lf").hidden = !log;
+}
+$("#m-ip").onclick = () => setMode(false);
+$("#m-log").onclick = () => setMode(true);
+$("#logfile").onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (f.size > 5e6) { $("#out").innerHTML = `<div class="panel empty err">That file is over 5 MB; trim it first (tail, grep).</div>`; return; }
+  $("#logtext").value = await f.text();
+};
+
+const FLAGS = { veneer: ["Borrowed reputation", "var(--bad)"], paradox: ["Paradox", "var(--bad)"],
+                threat: ["Threat", "var(--bad)"], watch: ["Watch", "var(--warn)"], "": ["Quiet", "var(--ok)"] };
+
+function logResults(res) {
+  const s = res.summary, f = s.flags;
+  const rows = res.results.map(r => {
+    if (r.error) return `<tr><td><span class="tag" style="color:var(--muted)">Error</span></td>
+      <td class="ip">${esc(r.ip)}</td><td class="n">${r.hits}</td><td></td><td></td><td class="err">${esc(r.error)}</td></tr>`;
+    const [label, color] = FLAGS[r.flag];
+    const veneer = r.veneer.length ? `<div class="why">Contradicted label: ${esc(r.veneer.join("; "))}</div>` : "";
+    return `<tr><td><span class="tag" style="color:${color}">${label}</span></td>
+      <td class="ip"><a data-ip="${esc(r.ip)}" title="${esc(r.sample)}">${esc(r.ip)}</a></td>
+      <td class="n">${r.hits}</td><td class="n">${r.paradox.toFixed(0)}</td><td class="n">${pct(r.threat)}</td>
+      <td>${esc(r.paradox_label)} · ${esc(r.direction)} · ${esc(r.threat_label)}${veneer}</td></tr>`;
+  }).join("");
+  const more = s.not_scanned ? ` ${s.not_scanned} less active IPs were not scanned; raise the limit to include them.` : "";
+  return `<div class="panel">
+    <div class="stats"><span><b>${s.lines}</b> lines</span><span><b>${s.public_ips}</b> public IPs</span>
+      <span><b>${s.private_ips}</b> private skipped</span><span><b>${s.scanned}</b> scanned in <b>${s.elapsed_s}s</b></span></div>
+    <p class="explain">${f.veneer} borrowed reputation, ${f.paradox} paradox, ${f.threat} threat, ${f.watch} to watch.${more}
+      Click an IP for its full report.</p>
+    <div class="tablewrap"><table class="logres">
+      <thead><tr><th>Flag</th><th>IP</th><th style="text-align:right">Hits</th><th style="text-align:right">Paradox</th>
+        <th style="text-align:right">Threat</th><th>Verdict</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="explain">No public IPs found.</td></tr>`}</tbody>
+    </table></div></div>`;
+}
+
+async function scanLog(text, limit) {
+  const go = $("#lgo"), out = $("#out");
+  go.disabled = true;
+  out.innerHTML = `<div class="panel empty"><span class="spinner"></span> Extracting IPs…</div>`;
+  try {
+    const res = await fetch("/api/logscan", { method: "POST", headers: { "Content-Type": "application/json" },
+                                             body: JSON.stringify({ text, limit }) });
+    let job = await res.json();
+    if (!res.ok) throw new Error(job.error);
+    while (job.state === "running") {
+      await new Promise(r => setTimeout(r, 1500));
+      const poll = await fetch(`/api/logscan?job=${job.id}`);
+      job = await poll.json();
+      if (!poll.ok) throw new Error(job.error);
+      if (job.state === "running" && job.total) {
+        out.innerHTML = `<div class="panel empty">Scanned ${job.done} of ${job.total} IPs…
+          <div class="progress"><span style="width:${100 * job.done / job.total}%"></span></div></div>`;
+      }
+    }
+    if (job.state === "error") throw new Error(job.error);
+    out.innerHTML = logResults(job.result);
+    out.querySelectorAll("td.ip a").forEach(a => a.onclick = () => { setMode(false); $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
+  } catch (e) {
+    out.innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
+  } finally { go.disabled = false; }
+}
+
+$("#lf").onsubmit = e => {
+  e.preventDefault();
+  const text = $("#logtext").value;
+  if (!text.trim()) return;
+  scanLog(text, Math.max(1, Math.min(50, +$("#loglimit").value || 25)));
+};
+$("#f").onsubmit = e => { e.preventDefault(); scan($("#ip").value.trim()); };
+document.querySelectorAll(".examples a").forEach(a => a.onclick = () => { $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
+const initial = new URLSearchParams(location.search).get("ip");
+if (initial) { $("#ip").value = initial; scan(initial); }
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+Oct 27 03:12:01 gw sshd[811]: Failed password for root from 45.155.205.233 port 50122 ssh2
+Oct 27 03:12:04 gw sshd[811]: Failed password for root from 45.155.205.233 port 50130 ssh2
+Oct 27 03:12:07 gw sshd[811]: Failed password for admin from 45.155.205.233 port 50141 ssh2
+Oct 27 03:14:22 gw sshd[902]: Invalid user oracle from 174.67.188.22 port 41022
+Oct 27 03:14:25 gw sshd[902]: Invalid user test from 174.67.188.22 port 41030
+Oct 27 03:20:10 gw kernel: [UFW BLOCK] IN=eth0 SRC=71.6.135.131 DST=203.0.113.10 PROTO=TCP DPT=8443
+Oct 27 03:21:44 gw kernel: [UFW BLOCK] IN=eth0 SRC=185.220.101.1 DST=203.0.113.10 PROTO=TCP DPT=22
+Oct 27 03:30:00 gw sshd[1004]: Accepted publickey for josh from 192.168.1.20 port 52211 ssh2
+Oct 27 03:31:12 gw systemd-resolved[400]: Using DNS server 8.8.8.8

@@ -1,0 +1,20 @@
+{
+ "cpes": [
+  "cpe:/a:f5:nginx"
+ ],
+ "hostnames": [
+  "berlin01.tor-exit.artikel10.org"
+ ],
+ "ip": "185.220.101.1",
+ "ports": [
+  80,
+  443,
+  9001,
+  9002
+ ],
+ "tags": [
+  "self-signed",
+  "tor"
+ ],
+ "vulns": []
+}
