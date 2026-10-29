@@ -328,6 +328,25 @@ paradox.example.edu {
 Then set `PARADOX_TRUST_PROXY=1`. A 25-IP log scan can take a few minutes (5 IPs took 43 s here), so log scans run as background
 jobs that the page polls, so proxy timeouts don't cut them off.
 
+## CI/CD
+
+| Workflow | Runs on | What it does |
+|---|---|---|
+| `ci.yml` | every PR and push to main | Tests on Python 3.10, 3.12, 3.13 (Linux) and 3.14 (native macOS), then installs `paradox` away from the checkout and checks its exit codes |
+| `docker.yml` | every PR and push to main | Builds the image, waits for it to report healthy, checks the password guard and API, proves no keys file, scan history or source tree ships and that it runs unprivileged. On main, publishes `ghcr.io/castor-o7/paradoxdetector:latest` and `:<short sha>` |
+| `release.yml` | pushing a `v*` tag | Checks the tag matches both version strings, builds and test-installs the wheel, creates a GitHub Release with the wheel and sdist, and publishes `:<version>` and `:<major.minor>` images |
+| `calibrate.yml` | by hand (Actions tab) | Live calibration on a fresh labeled set. Posts the metrics to the run summary and uploads the report. Beacon keys are optional repository secrets |
+
+PR runs cancel the run they supersede, every job has a timeout, and every action is pinned to a
+commit SHA, which Dependabot keeps current. To release:
+
+```bash
+# bump version in pyproject.toml and paradox/__init__.py, merge, then:
+git tag v0.3.0 && git push origin v0.3.0
+```
+
+To run the published image instead of building: `docker pull ghcr.io/castor-o7/paradoxdetector:latest`.
+
 ## Analyst summary (optional)
 
 `pip install anthropic`, then set `ANTHROPIC_API_KEY`. The web UI's **Generate with Claude** button and
