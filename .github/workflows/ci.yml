@@ -1,48 +1,51 @@
+# Checks every pull request and push to main: tests on each supported Python, natively on macOS
+# (where the app is used day to day), and an install of the `paradox` command away from the checkout.
+# The Docker image has its own workflow (docker.yml).
+
 name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run it supersedes. Runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    name: tests (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python: ["3.10", "3.12", "3.13"]
+        include:
+          # watch.py relies on inodes and signals; prove them on a real Mac, not just Linux.
+          - os: macos-latest
+            python: "3.14"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
       # Tests use fixtures and stubs: no API keys, no network calls to beacons.
       - run: python -m unittest discover -s tests -v
       - name: Installs as an app
+        shell: bash
         run: |
           pip install .
           cd "$RUNNER_TEMP"            # away from the checkout, like a real install
           paradox --version
           paradox where
           paradox beacons
-
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t paradox-detector .
-      - name: Container starts and passes its health check
-        run: |
-          docker run -d --name pd -p 8787:8787 -e PARADOX_PASSWORD=ci-only paradox-detector
-          docker run --rm paradox-detector paradox --version
-          for i in $(seq 1 20); do
-            curl -fsS http://127.0.0.1:8787/healthz && exit 0
-            sleep 1
-          done
-          docker logs pd
-          exit 1
-      - name: Requires the password
-        run: test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/)" = 401
+          # Exit status contract: bad input is 2.
+          set +e; paradox scan 10.0.0.1; status=$?; set -e
+          test "$status" = 2

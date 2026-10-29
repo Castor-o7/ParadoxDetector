@@ -1,0 +1,74 @@
+# Run the scoring calibration (paradox calibrate) against live beacons.
+#
+# Started by hand from the Actions tab, since every run spends beacon API quota. It draws a fresh
+# labeled set (malicious IPs from blocklist.de / CINS / ET, benign resolvers and major sites), scans
+# it, and posts AUC, detection and false-positive rates to the run summary. The full report is
+# uploaded as the "calibration" artifact. Set `ref` to calibrate a branch before merging it.
+#
+# API keys are optional repository secrets (Settings > Secrets and variables > Actions), named as
+# in paradox/env.example: OTX_API_KEY, GREYNOISE_API_KEY, ABUSEIPDB_API_KEY, THREATFOX_API_KEY,
+# VIRUSTOTAL_API_KEY. Without them the run is keyless; beacons that need a key are skipped, and
+# keyless OTX/GreyNoise rate-limit quickly from shared GitHub runner addresses.
+
+name: Calibrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit whose scoring to calibrate
+        default: main
+      size:
+        description: Number of malicious IPs to sample
+        default: "30"
+      seed:
+        description: Sampling seed (same seed + same day's feeds = same labels)
+        default: "7"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calibrate
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OTX_API_KEY: ${{ secrets.OTX_API_KEY }}
+      GREYNOISE_API_KEY: ${{ secrets.GREYNOISE_API_KEY }}
+      ABUSEIPDB_API_KEY: ${{ secrets.ABUSEIPDB_API_KEY }}
+      THREATFOX_API_KEY: ${{ secrets.THREATFOX_API_KEY }}
+      VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Which beacons have keys
+        run: python -m paradox beacons
+
+      - name: Run the calibration
+        shell: bash # unlike the default shell, this sets pipefail, so a failed run fails the job despite tee
+        env:
+          SIZE: ${{ inputs.size }}
+          SEED: ${{ inputs.seed }}
+          REF: ${{ inputs.ref }}
+        run: |
+          python -m paradox calibrate --new-labels --size "$SIZE" --seed "$SEED" 2>&1 | tee calibration.txt
+          { echo "Calibration of \`$REF\` (size $SIZE, seed $SEED)"; echo '```'
+            grep -v '^  \[' calibration.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: calibration
+          path: |
+            calibration.txt
+            data/calibration/labels.json
+            data/calibration/report.json
+          if-no-files-found: ignore

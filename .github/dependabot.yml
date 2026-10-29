@@ -1,11 +1,15 @@
+# Weekly update PRs. Actions are pinned to commit SHAs (a tag can be moved to point at different
+# code; a SHA can't), and Dependabot keeps those pins and their version comments current.
 version: 2
 updates:
-  - package-ecosystem: pip
+  - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+    groups:
+      actions: {patterns: ["*"]}     # one PR for all action bumps
   - package-ecosystem: docker
     directory: /
     schedule: {interval: weekly}
-  - package-ecosystem: github-actions
+  - package-ecosystem: pip
     directory: /
     schedule: {interval: weekly}
