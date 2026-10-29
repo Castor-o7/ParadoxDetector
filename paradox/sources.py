@@ -21,8 +21,10 @@ import ipaddress
 import json
 import math
 import re
+import socket
 import time
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
@@ -683,6 +685,66 @@ def check_tor(ip: str, sig: Signal) -> None:
     sig.facts = {"tor_exit": is_exit}
 
 
+# Operators whose reverse DNS names identify them. Anyone can set an IP's PTR
+# record to any name, but only the operator can make that name resolve back, so
+# a claim counts only when it is forward-confirmed (PTR -> name -> same IP).
+IDENTITY_DOMAINS = {
+    "shodan.io": ("Shodan", "scanner"),
+    "censys-scanner.com": ("Censys", "scanner"),
+    "shadowserver.org": ("Shadowserver", "scanner"),
+    "binaryedge.ninja": ("BinaryEdge", "scanner"),
+    "onyphe.net": ("ONYPHE", "scanner"),
+    "googlebot.com": ("Googlebot", "crawler"),
+    "search.msn.com": ("Bingbot", "crawler"),
+    "applebot.apple.com": ("Applebot", "crawler"),
+}
+DNS_TIMEOUT = 5.0
+
+
+def _resolve(fn, *args):
+    """Run a blocking resolver call with a deadline (the stdlib resolver has none)."""
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        return pool.submit(fn, *args).result(timeout=DNS_TIMEOUT)
+    finally:
+        pool.shutdown(wait=False)
+
+
+def claimed_identity(name: str) -> tuple[str, str] | None:
+    name = name.lower().rstrip(".")
+    return next((v for d, v in IDENTITY_DOMAINS.items() if name == d or name.endswith("." + d)), None)
+
+
+def check_rdns(ip: str, sig: Signal) -> None:
+    try:
+        name = _resolve(socket.gethostbyaddr, ip)[0]
+    except (socket.herror, socket.gaierror):
+        sig.summary = "No reverse DNS"
+        return
+    except FuturesTimeout:
+        raise BeaconError("reverse DNS lookup timed out") from None
+    try:
+        forward = {ipaddress.ip_address(a[4][0].split("%")[0]) for a in _resolve(socket.getaddrinfo, name, None)}
+    except (socket.herror, socket.gaierror, FuturesTimeout):
+        forward = set()
+    confirmed = ipaddress.ip_address(ip) in forward
+    sig.facts = {"ptr": name, "confirmed": confirmed}
+    claim = claimed_identity(name)
+    if not claim:
+        sig.summary = f"{name} ({'forward-confirmed' if confirmed else 'does not resolve back'})"
+        return
+    operator, kind = claim
+    sig.facts["claim"] = operator
+    if confirmed:
+        sig.summary = f"{operator} {kind} ({name}, forward-confirmed)"
+        sig.facts["benign_label"] = f"rDNS: {operator} {kind}, forward-confirmed"
+        sig.facts["label_kind"] = kind        # a confirmed scanner explains scanning, as GreyNoise's label does
+    else:
+        sig.summary = f"Claims to be {operator} ({name}) but the name does not resolve back to this IP"
+        sig.facts["spoofed_identity"] = (f"reverse DNS claims {operator} ({name}), but {name} "
+                                         "does not resolve back to this IP")
+
+
 BEACONS: list[Beacon] = [
     Beacon("otx", "AlienVault OTX pulses", "fast", 1.0, check_otx, "OTX_API_KEY", False, "minutes-hours"),
     Beacon("greynoise", "GreyNoise sensors", "fast", 0.8, check_greynoise, "GREYNOISE_API_KEY", False, "hours"),
@@ -696,6 +758,7 @@ BEACONS: list[Beacon] = [
     Beacon("network", "Network (ASN) reputation", "network", 0.0, check_network, None, False, "routing + ASN-DROP"),
     Beacon("rdap", "RDAP registration", "context", 0.0, check_rdap, None, False, "registry"),
     Beacon("tor", "Tor exit list", "context", 0.0, check_tor, None, False, "hourly"),
+    Beacon("rdns", "Reverse DNS identity", "context", 0.0, check_rdns, None, False, "live DNS", "dns"),
 ]
 
 

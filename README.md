@@ -89,6 +89,7 @@ Developing: `python3 -m unittest discover -s tests` (no keys or network needed).
 | network | Neighborhood (/24, IPv6 /64) | none | Blocklisted neighbors from blocklist.de, CINS Army, ET compromised, Feodo, Spamhaus DROP |
 | network | Network (ASN) via RIPEstat | none | ASN owner, Spamhaus ASN-DROP (criminal-run networks), hosting heuristic |
 | context | RDAP, Tor exit list | none | Ownership and anonymizer status (not scored) |
+| context | Reverse DNS identity | none | Forward-confirmed reverse DNS: verifies (or catches forging of) a claimed operator identity |
 
 Bulk feeds (Feodo, DROP, KEV, Tor) are cached in the app's home directory (`paradox where`).
 
@@ -114,6 +115,12 @@ Each beacon produces a **threat** reading (0–1) and a **confidence** (0–1). 
      themes, where pulses that mention both scanning and attacks don't vote. Brute force, malware or
      C2 evidence is not explained and still triggers the veneer. Measured 2026-10-28: Shodan's
      scanner went from paradox 100 to 17, and a brute-forcer wearing the same label still scores 94.
+   - **Claimed identities are verified.** Anyone can set an IP's reverse DNS to
+     `census.shodan.io` or `crawl.googlebot.com`, but only the real operator can make that name
+     resolve back to the IP. A forward-confirmed claim to a known scanner or crawler domain
+     (`IDENTITY_DOMAINS` in `paradox/sources.py`) is a label. It gives the scanner rule a second
+     source, so it keeps working when GreyNoise is rate-limited. A claim that doesn't resolve back
+     is a **forged identity**: it triggers the veneer and sets a "Suspicious" threat floor.
    - **Labels never discount their own contradiction.** A GreyNoise RIOT "business service" label
      does not weaken OTX, or the veneer would protect itself.
    - **Shared infrastructure.** On AbuseIPDB "Content Delivery Network" addresses (GitHub,

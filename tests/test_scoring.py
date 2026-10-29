@@ -260,6 +260,31 @@ class SharedInfrastructureTests(unittest.TestCase):
         self.assertTrue(r["veneer"]["active"])
 
 
+class ForgedIdentityTests(unittest.TestCase):
+    def rdns(self, **facts):
+        s = sig("rdns", "context", None, 0.0)
+        s.facts.update(facts)
+        return s
+
+    def test_forged_identity_is_a_veneer_with_a_threat_floor(self):
+        r = compute([self.rdns(spoofed_identity="reverse DNS claims Shodan (x.shodan.io), but ..."),
+                     sig("otx", "fast", 0.0, 0.5), sig("spamhaus", "slow", 0.0, 0.5)], now=NOW)
+        self.assertTrue(r["veneer"]["active"])
+        self.assertEqual(r["threat_label"], "Suspicious")
+        self.assertIn("forged label", r["explanation"])
+
+    def test_confirmed_scanner_rdns_explains_scanning_without_greynoise(self):
+        label = self.rdns(benign_label="rDNS: Shodan scanner, forward-confirmed", label_kind="scanner")
+        abuse = sig("abuseipdb", "fast", 1.0, 1.0, last_seen="2026-10-26")
+        abuse.facts["scan_share"] = 0.77
+        greynoise_down = sig("greynoise", "fast", None, 0.0, status="error")
+        r = compute([label, abuse, greynoise_down, sig("spamhaus", "slow", 0.0, 0.5),
+                     sig("internetdb", "slow", 0.05, 0.6)], now=NOW)
+        self.assertEqual(r["scanner"]["explained"], ["abuseipdb (77% scanning)"])
+        self.assertFalse(r["veneer"]["active"])
+        self.assertLess(r["paradox"], 35)
+
+
 class OtxQualityTests(unittest.TestCase):
     def otx(self, *pulses):
         return {"pulse_info": {"count": len(pulses), "pulses": list(pulses)}}
