@@ -58,11 +58,14 @@ jobs:
           docker run --rm paradox:test paradox beacons
           # Runs unprivileged.
           test "$(docker exec pd id -u)" != 0
+          # Negated commands (`! cmd`) never trip `bash -e`, so each "must not" check is an explicit if.
           # Nothing private ships in the image: no keys file, no scan history, no source tree.
-          ! docker exec pd find / -xdev \( -name '.env' -o -name 'history.sqlite3' \) -not -path '/var/lib/paradox/*' 2>/dev/null | grep .
-          docker exec pd test ! -e /src
+          leaked=$(docker exec pd find / -xdev \( -name '.env' -o -name 'history.sqlite3' \) \
+                     -not -path '/var/lib/paradox/*' 2>/dev/null || true)
+          if [ -n "$leaked" ]; then echo "::error::private files in the image: $leaked"; exit 1; fi
+          if docker exec pd test -e /tmp/src; then echo "::error::build source left in the image"; exit 1; fi
           # Refuses to start exposed without a password.
-          ! docker run --rm paradox:test
+          if docker run --rm paradox:test; then echo "::error::started on 0.0.0.0 without a password"; exit 1; fi
 
       - name: Logs
         if: always()
