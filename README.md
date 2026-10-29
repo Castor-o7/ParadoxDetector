@@ -9,21 +9,70 @@ A high **paradox score** usually means live sources (OTX pulses, sensor networks
 see a threat that curated blocklists and vendor reputation haven't picked up yet. That's an emerging
 threat that slips past slower defenses.
 
-## Run it
+## Install
 
 ```bash
-python3 server.py            # web app at http://127.0.0.1:8787
-python3 -m paradox 45.155.205.233            # CLI
-python3 -m paradox 45.155.205.233 --json     # raw report
-python3 -m paradox 45.155.205.233 --history  # recorded scans + beacon lag
-python3 -m paradox --rescan-tracked          # rescan every IP with history (cron this)
-python3 -m paradox --log examples/sample-auth.log   # batch: rank every IP in a log
-python3 -m paradox.mcp_server                # MCP server on stdio, for AI assistants
-python3 -m unittest discover -s tests        # tests
+pipx install git+https://github.com/Castor-o7/ParadoxDetector   # or, from a checkout: pipx install .
+paradox init        # creates your keys file (~/.paradox-detector/.env); every key is optional
+paradox             # opens the app in your browser
 ```
 
-You only need Python 3.10+. The core app uses the standard library alone. Copy `.env.example` to `.env`
-to add API keys. Every key is optional, and a beacon that needs a missing key is skipped.
+You only need Python 3.10+. The core uses the standard library alone (`pipx install
+"paradox-detector[narrative] @ git+…"` adds the optional Claude summaries). A beacon that needs a
+missing key is skipped. `paradox beacons` shows which keys are set, and `paradox where` shows where
+keys, history and caches live. Set `PARADOX_HOME` to move them. Run from a source checkout
+(`python3 -m paradox …`), it keeps everything in the checkout instead.
+
+## App and headless mode
+
+`paradox` on its own is the **app**: it starts the local server and opens the UI. Every other
+command is **headless**, for servers, cron, CI and AI agents. Each one prints plain text or `--json`
+and exits with **0** (nothing flagged), **1** (something flagged as veneer, paradox or threat) or
+**2** (bad input), so scripts can branch on the result.
+
+| Command | What it does |
+|---|---|
+| `paradox` / `paradox app` | Open the app in your browser |
+| `paradox serve` | Run the web UI and JSON API without opening a browser (what Docker runs) |
+| `paradox scan IP [IP ...]` | Full report for one or more IPs (`--json`, `--narrate`) |
+| `paradox log FILE` | Rank every IP in a log (`-` for stdin; `--csv`, `--json`) |
+| `paradox watch --log FILE` | Sensor: follow logs live, scan new IPs, alert on findings |
+| `paradox history IP` | Recorded scans and measured beacon lag |
+| `paradox rescan` | Rescan every tracked IP once |
+| `paradox mcp` | MCP server on stdio, for AI assistants |
+| `paradox calibrate` | Check scores against labeled IPs |
+| `paradox beacons` / `init` / `where` | Key status, create keys file, show storage paths |
+
+```bash
+paradox scan 45.155.205.233 --json | jq .score.paradox
+paradox log /var/log/auth.log || echo "something in the auth log needs a look"
+```
+
+The old forms (`python3 -m paradox 1.2.3.4`, `--log`, `--history`, `--rescan-tracked`,
+`python3 server.py`) still work.
+
+### Watch mode
+
+`paradox watch` is the headless sensor. It follows one or more logs like `tail -F`: it survives
+log rotation and truncation, and waits for a file that doesn't exist yet. Each public IP is scanned
+once it appears (or after `--min-hits N`), and again only after `--rescan-after` hours (default 24),
+so a busy log doesn't hammer the beacons.
+
+```bash
+paradox watch --log /var/log/auth.log --log /var/log/nginx/access.log
+paradox watch --log /var/log/auth.log --json --webhook https://hooks.slack.com/services/...
+journalctl -fu sshd | paradox watch --log -
+paradox watch --rescan-every 6             # no logs: keep tracked IPs fresh (replaces cron)
+```
+
+An alert fires when an IP's flag enters the alert set (`--alert-on`, default
+`veneer,paradox,threat`) or changes, not on every sighting. Alerts go to stdout (one JSON object
+per line with `--json`) and, with `--webhook`, are POSTed as JSON. The payload's `text` field works
+as-is with Slack and Mattermost incoming webhooks. Log lines are untrusted, so
+the attacker-written `sample` line is kept out of `text` and only appears in the JSON `alert`
+object. `docker stop` and Ctrl+C shut it down cleanly. It exits 1 if anything alerted.
+
+Developing: `python3 -m unittest discover -s tests` (no keys or network needed).
 
 ## Beacons
 
@@ -41,7 +90,7 @@ to add API keys. Every key is optional, and a beacon that needs a missing key is
 | network | Network (ASN) via RIPEstat | none | ASN owner, Spamhaus ASN-DROP (criminal-run networks), hosting heuristic |
 | context | RDAP, Tor exit list | none | Ownership and anonymizer status (not scored) |
 
-Bulk feeds (Feodo, DROP, KEV, Tor) are cached in `.cache/`.
+Bulk feeds (Feodo, DROP, KEV, Tor) are cached in the app's home directory (`paradox where`).
 
 ## How the score works
 
@@ -95,7 +144,7 @@ guilt by association is a different claim from direct evidence.
 
 ### Calibration
 
-`python3 -m paradox.calibrate` scores a labeled set of IPs and reports how well the scores separate
+`paradox calibrate` scores a labeled set of IPs and reports how well the scores separate
 them. Labels never come from the score's own inputs:
 
 - **Malicious:** IPs on at least 2 of blocklist.de, CINS Army and ET compromised. Those lists only
@@ -161,14 +210,14 @@ Some sources share upstream data, and two copies of one observation shouldn't lo
 
 ### History and lag
 
-Every fresh scan is saved to `data/history.sqlite3`. For each IP, the app records when each beacon
+Every fresh scan is saved to `history.sqlite3` in the app's home directory. For each IP, the app records when each beacon
 first flagged it (threat ≥ 0.4 at confidence ≥ 0.5) and reports either how long the slow tier took to
 catch up or how long the paradox has been open. The web UI charts fast vs. slow scores over time.
 
-Timelines need repeated scans, so schedule a rescan, for example every 6 hours:
+Timelines need repeated scans. Leave `paradox watch --rescan-every 6` running, or use cron:
 
 ```cron
-0 */6 * * * cd /path/to/ParadoxDetector && python3 -m paradox --rescan-tracked
+0 */6 * * * paradox rescan
 ```
 
 ### OTX hardening
@@ -198,9 +247,9 @@ scans the most active ones, and ranks them by how much attention they deserve:
 4. **Watch**: mild tension or suspicious
 
 ```bash
-python3 -m paradox --log /var/log/auth.log                 # table
-journalctl -u sshd | python3 -m paradox --log - --limit 40  # from stdin
-python3 -m paradox --log access.log --min-hits 5 --csv > triage.csv
+paradox log /var/log/auth.log                    # table
+journalctl -u sshd | paradox log - --limit 40     # from stdin
+paradox log access.log --min-hits 5 --csv > triage.csv
 ```
 
 Private and reserved addresses are counted and skipped. `--limit` (default 25, `0` for all) caps how
@@ -210,7 +259,7 @@ The web app has the same feature under **Scan a log** (paste or pick a file up t
 
 ## MCP server
 
-`paradox/mcp_server.py` puts the detector back where the class prototype started: as tools an AI
+`paradox mcp` puts the detector back where the class prototype started: as tools an AI
 assistant can call. It speaks MCP over stdio using only the standard library.
 
 | Tool | What it does |
@@ -223,14 +272,13 @@ assistant can call. It speaks MCP over stdio using only the standard library.
 Register it with Claude Code:
 
 ```bash
-claude mcp add paradox -e PYTHONPATH=/path/to/ParadoxDetector -- python3 -m paradox.mcp_server
+claude mcp add paradox -- paradox mcp
 ```
 
 Or in any client's JSON config:
 
 ```json
-{"mcpServers": {"paradox": {"command": "python3", "args": ["-m", "paradox.mcp_server"],
-                            "env": {"PYTHONPATH": "/path/to/ParadoxDetector"}}}}
+{"mcpServers": {"paradox": {"command": "paradox", "args": ["mcp"]}}}
 ```
 
 **Prompt-injection hygiene.** Pulse titles, tags and log lines are written by third parties,
@@ -255,12 +303,14 @@ API quotas (and Anthropic credits, if narratives are on), so it has guards:
 ### Docker
 
 ```bash
-cp .env.example .env        # add keys and PARADOX_PASSWORD
+cp paradox/env.example .env   # add keys and PARADOX_PASSWORD
 docker compose up -d --build
+docker compose run --rm web paradox scan 45.155.205.233 --json   # any headless command
 ```
 
-Compose runs two services that share one volume: `web` (published on 127.0.0.1:8787) and `rescan`
-(rescans tracked IPs every 6 hours, so history and lag fill in without cron). `.env` is in
+Compose runs two services that share one volume: `web` (`paradox serve`, published on
+127.0.0.1:8787) and `watch` (`paradox watch --rescan-every 6`, so history and lag fill in without
+cron). The compose file shows how to mount host logs into `watch` and add a webhook. `.env` is in
 `.dockerignore` and is passed at runtime, never baked into the image. The container runs as an
 unprivileged user.
 
@@ -287,17 +337,20 @@ short verdict, explains why the beacons disagree, and recommends next steps.
 ## Layout
 
 ```
+paradox/cli.py        the `paradox` command: app + headless subcommands
 paradox/sources.py    beacon adapters -> Signal
 paradox/scoring.py    tier scores, paradox, threat
 paradox/engine.py     concurrent scan + caching
 paradox/history.py    SQLite scan history + lag measurement
-paradox/narrative.py  optional Claude summary
 paradox/logscan.py    batch mode: extract IPs from logs, scan, rank
+paradox/watch.py      headless sensor: follow logs, alert, periodic rescans
+paradox/server.py     stdlib HTTP server + JSON API (/api/scan, /api/logscan, /api/history, ...)
+paradox/web/          single-page UI
 paradox/mcp_server.py MCP server (stdio JSON-RPC) exposing the scanner as tools
+paradox/narrative.py  optional Claude summary
 paradox/calibrate.py  scoring checked against labeled IPs
-paradox/__main__.py   CLI
-server.py             stdlib HTTP server + JSON API (/api/scan, /api/logscan, /api/history, ...)
-web/index.html        single-page UI
-Dockerfile, docker-compose.yml   container deployment (web + periodic rescan)
+paradox/env.example   keys file template (paradox init)
+pyproject.toml        packaging; installs the `paradox` command
+Dockerfile, docker-compose.yml   container deployment (serve + watch)
 examples/             sample log for trying batch mode
 ```

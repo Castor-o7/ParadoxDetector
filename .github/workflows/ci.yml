@@ -21,6 +21,13 @@ jobs:
           python-version: ${{ matrix.python }}
       # Tests use fixtures and stubs: no API keys, no network calls to beacons.
       - run: python -m unittest discover -s tests -v
+      - name: Installs as an app
+        run: |
+          pip install .
+          cd "$RUNNER_TEMP"            # away from the checkout, like a real install
+          paradox --version
+          paradox where
+          paradox beacons
 
   docker:
     runs-on: ubuntu-latest
@@ -30,6 +37,7 @@ jobs:
       - name: Container starts and passes its health check
         run: |
           docker run -d --name pd -p 8787:8787 -e PARADOX_PASSWORD=ci-only paradox-detector
+          docker run --rm paradox-detector paradox --version
           for i in $(seq 1 20); do
             curl -fsS http://127.0.0.1:8787/healthz && exit 0
             sleep 1

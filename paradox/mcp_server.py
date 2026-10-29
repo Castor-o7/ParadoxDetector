@@ -1,10 +1,10 @@
 """MCP server over stdio, so an AI assistant can call the detector as tools.
 
-    python3 -m paradox.mcp_server
+    paradox mcp
 
 Register it with an MCP client, e.g. Claude Code:
 
-    claude mcp add paradox -e PYTHONPATH=/path/to/ParadoxDetector -- python3 -m paradox.mcp_server
+    claude mcp add paradox -- paradox mcp
 
 Speaks newline-delimited JSON-RPC 2.0 on stdin/stdout (the MCP stdio
 transport) using only the standard library. Anything diagnostic goes to stderr,

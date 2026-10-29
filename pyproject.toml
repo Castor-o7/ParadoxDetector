@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paradox-detector"
+version = "0.2.0"
+description = "Flags IPs where fast-updating threat beacons disagree with slow ones, and catches borrowed reputations."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []            # the core is standard library only
+authors = [{ name = "Josh" }]
+classifiers = [
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+narrative = ["anthropic"]     # Claude-written analyst summaries
+
+[project.urls]
+Repository = "https://github.com/Castor-o7/ParadoxDetector"
+
+[project.scripts]
+paradox = "paradox.cli:main"
+
+[tool.setuptools]
+packages = ["paradox"]
+
+[tool.setuptools.package-data]
+paradox = ["web/*.html", "env.example"]

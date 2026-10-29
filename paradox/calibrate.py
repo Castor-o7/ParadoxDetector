@@ -33,7 +33,7 @@ from . import config, scoring
 from .sources import (BEACONS, NEIGHBOR_LISTS, Signal, _drop_networks, _feodo_index, _ip_list,
                       apply_otx, fetch_otx, run_beacon)
 
-DIR = config.ROOT / "data" / "calibration"
+DIR = config.DATA_DIR / "calibration"
 SCANS = DIR / "scans"
 LABELS = DIR / "labels.json"
 
@@ -244,7 +244,7 @@ def render(ev: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="paradox.calibrate", description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser(prog="paradox calibrate", description=__doc__.split("\n\n")[0])
     ap.add_argument("--rescore", action="store_true", help="score saved scans only; no API calls")
     ap.add_argument("--new-labels", action="store_true", help="draw a fresh labeled set")
     ap.add_argument("--size", type=int, default=30, help="malicious sample size (default 30)")

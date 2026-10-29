@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from . import config
 from .sources import age_days, parse_dt
 
-DB_PATH = config.ROOT / "data" / "history.sqlite3"
+DB_PATH = config.DATA_DIR / "history.sqlite3"
 FLAG_THREAT = 0.4
 FLAG_CONFIDENCE = 0.5
 
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS scans_ip_time ON scans (ip, scanned_at);
 
 
 def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)

@@ -1,7 +1,6 @@
 # Keys are passed at runtime (env_file), never baked into the image.
 .env
 .env.*
-!.env.example
 data/
 .cache/
 **/__pycache__/

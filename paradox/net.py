@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from . import config
 
-USER_AGENT = "ParadoxDetector/0.1 (threat-intel research tool)"
+USER_AGENT = "ParadoxDetector/0.2 (threat-intel research tool)"
 
 
 def fetch(url: str, *, headers: dict[str, str] | None = None, body: dict | None = None,
@@ -65,7 +65,7 @@ def cached(name: str, ttl: float, loader: Callable[[], Any]) -> Any:
         value = loader()
         _mem[name] = (time.time(), value)
         try:
-            config.CACHE_DIR.mkdir(exist_ok=True)
+            config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(value))
         except OSError:
             pass

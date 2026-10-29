@@ -5,11 +5,30 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-CACHE_DIR = ROOT / ".cache"
+PACKAGE = Path(__file__).resolve().parent
+ROOT = PACKAGE.parent
 
 
-def load_dotenv(path: Path = ROOT / ".env") -> None:
+def _home() -> Path:
+    """Where keys (.env), history and caches live.
+
+    PARADOX_HOME wins. A source checkout keeps everything in the checkout, as
+    before; an installed copy (pipx/pip) uses ~/.paradox-detector.
+    """
+    if os.environ.get("PARADOX_HOME"):
+        return Path(os.environ["PARADOX_HOME"]).expanduser()
+    if (ROOT / "pyproject.toml").exists():
+        return ROOT
+    return Path.home() / ".paradox-detector"
+
+
+HOME = _home()
+DATA_DIR = HOME / "data"
+CACHE_DIR = HOME / ".cache"
+ENV_FILE = HOME / ".env"
+
+
+def load_dotenv(path: Path = ENV_FILE) -> None:
     """Load KEY=VALUE lines into os.environ without overriding existing vars."""
     if not path.exists():
         return

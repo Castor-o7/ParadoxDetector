@@ -1,3 +1,0 @@
-# Core app uses only the Python standard library.
-# Optional: Claude-written analyst summaries.
-anthropic

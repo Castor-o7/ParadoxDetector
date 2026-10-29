@@ -7,4 +7,4 @@ slow beacons (curated blocklists, vendor reputation, weekly scan data) have not
 caught up with yet.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

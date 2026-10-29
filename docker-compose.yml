@@ -1,5 +1,5 @@
 # docker compose up -d   ->  http://127.0.0.1:8787
-# Put API keys and PARADOX_PASSWORD in .env (see .env.example).
+# Put API keys and PARADOX_PASSWORD in .env (paradox init, or copy paradox/env.example).
 services:
   web:
     build: .
@@ -7,23 +7,22 @@ services:
     ports:
       - "127.0.0.1:8787:8787"     # loopback only; front it with a TLS reverse proxy to expose it
     volumes:
-      - paradox-data:/app/data
-      - paradox-cache:/app/.cache
+      - paradox:/var/lib/paradox
     restart: unless-stopped
 
-  # Rescans every tracked IP every 6 hours so the history charts and lag
-  # measurements fill in. Shares the history database with the web app.
-  rescan:
+  # Headless sensor sharing the same history. It rescans tracked IPs every
+  # 6 hours. To follow host logs too, mount them and add --log, e.g.
+  #   volumes: [/var/log/auth.log:/logs/auth.log:ro]
+  #   command: [paradox, watch, --rescan-every, "6", --log, /logs/auth.log, --webhook, https://...]
+  watch:
     build: .
     env_file: .env
-    command: ["sh", "-c", "while true; do sleep 21600; python -m paradox --rescan-tracked; done"]
+    command: ["paradox", "watch", "--rescan-every", "6"]
     volumes:
-      - paradox-data:/app/data
-      - paradox-cache:/app/.cache
+      - paradox:/var/lib/paradox
     healthcheck:
       disable: true
     restart: unless-stopped
 
 volumes:
-  paradox-data:
-  paradox-cache:
+  paradox:

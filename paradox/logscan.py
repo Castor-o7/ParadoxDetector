@@ -29,23 +29,26 @@ DEFAULT_LIMIT = 25
 DEFAULT_WORKERS = 2     # each scan already fans out to every beacon; stay polite
 
 
+def ips_in(line: str) -> list[tuple[str, bool]]:
+    """Distinct addresses in one line, as (ip, is_public)."""
+    out: dict[str, bool] = {}
+    for m in (*IPV4.finditer(line), *IPV6.finditer(line)):
+        try:
+            addr = ipaddress.ip_address(m.group())
+        except ValueError:
+            continue
+        out.setdefault(str(addr), addr.is_global)
+    return list(out.items())
+
+
 def extract(lines: Iterable[str]) -> dict:
     """Count IP occurrences. Returns {"lines", "public": {ip: info}, "private": n}."""
     public: dict[str, dict] = {}
     private: set[str] = set()
     n = 0
     for n, line in enumerate(lines, 1):
-        seen_here = set()
-        for m in (*IPV4.finditer(line), *IPV6.finditer(line)):
-            try:
-                addr = ipaddress.ip_address(m.group())
-            except ValueError:
-                continue
-            ip = str(addr)
-            if ip in seen_here:
-                continue
-            seen_here.add(ip)
-            if not addr.is_global:
+        for ip, is_public in ips_in(line):
+            if not is_public:
                 private.add(ip)
                 continue
             info = public.setdefault(ip, {"hits": 0, "first_line": n, "sample": line.strip()[:300]})
@@ -71,8 +74,7 @@ FLAG_RANK = {"veneer": 0, "paradox": 1, "threat": 2, "watch": 3, "": 4}
 
 
 def row(ip: str, info: dict, report: dict | None, error: str | None = None) -> dict:
-    out = {"ip": ip, "hits": info["hits"], "first_line": info["first_line"],
-           "last_line": info["last_line"], "sample": info["sample"]}
+    out = {"ip": ip, **info}   # hits, sample, and where it was seen (lines or timestamps)
     if report is None:
         return {**out, "error": error, "flag": "", "paradox": None, "threat": None}
     sc = report["score"]

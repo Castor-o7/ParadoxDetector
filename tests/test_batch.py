@@ -130,7 +130,7 @@ class McpTests(unittest.TestCase):
 
 class ServerGuardTests(unittest.TestCase):
     def start(self, **settings):
-        import server
+        from paradox import server
         for k, v in settings.items():
             p = mock.patch.object(server, k, v)
             p.start()
@@ -176,7 +176,7 @@ class ServerGuardTests(unittest.TestCase):
         self.assertEqual(cm.exception.code, 415)
 
     def test_open_bind_refused_without_password(self):
-        import server
+        from paradox import server
         with mock.patch.dict(os.environ, {"PARADOX_HOST": "0.0.0.0"}), \
              mock.patch.object(server, "PASSWORD", None), self.assertRaises(SystemExit):
             server.main()
