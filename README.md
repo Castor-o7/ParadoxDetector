@@ -1,5 +1,7 @@
 # Cyber Security Paradox Detector
 
+[![CI](https://github.com/Castor-o7/ParadoxDetector/actions/workflows/ci.yml/badge.svg)](https://github.com/Castor-o7/ParadoxDetector/actions/workflows/ci.yml)
+
 Give it a public IP. It queries several threat-intel beacons at the same time and scores how much the
 **fast-updating** beacons disagree with the **slow-updating** ones.
 

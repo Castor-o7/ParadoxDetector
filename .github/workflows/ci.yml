@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # Tests use fixtures and stubs: no API keys, no network calls to beacons.
+      - run: python -m unittest discover -s tests -v
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t paradox-detector .
+      - name: Container starts and passes its health check
+        run: |
+          docker run -d --name pd -p 8787:8787 -e PARADOX_PASSWORD=ci-only paradox-detector
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8787/healthz && exit 0
+            sleep 1
+          done
+          docker logs pd
+          exit 1
+      - name: Requires the password
+        run: test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/)" = 401
