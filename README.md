@@ -9,6 +9,8 @@ A high **paradox score** usually means live sources (OTX pulses, sensor networks
 see a threat that curated blocklists and vendor reputation haven't picked up yet. That's an emerging
 threat that slips past slower defenses.
 
+Where it's headed: [ROADMAP.md](ROADMAP.md), on unmasking borrowed legitimacy.
+
 ## Install
 
 ```bash
