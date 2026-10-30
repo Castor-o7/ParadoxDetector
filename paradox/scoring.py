@@ -59,6 +59,7 @@ VENEER_WEIGHT = 0.25
 NETWORK_WEIGHT = 0.2
 SCAN_EXPLAINED_SHARE = 0.6     # evidence this scan-dominated is what a scanner label predicts
 SHARED_INFRA_OTX_FACTOR = 0.5  # OTX on CDN addresses: mostly "malware contacted this"
+THIN_REPORTERS = 12            # fewer AbuseIPDB reporters than this scale its reading down
 SPOOF_STRENGTH = 0.6           # veneer strength of a forged reverse-DNS identity
 SPOOF_THREAT_FLOOR = 0.3       # forging an identity is suspicious on its own, but not proof
 HOSTING_DISCOUNT = 0.5
@@ -160,6 +161,19 @@ def explain_scanning(signals: list[Signal]) -> tuple[list[Signal], dict]:
     return out, info
 
 
+def thin_reports(signals: list[Signal]) -> list[Signal]:
+    """A handful of reporters can be mistaken or describe one misconfigured
+    host, and busy addresses collect stray reports. Scale AbuseIPDB's reading by
+    how far its distinct reporters fall short of THIN_REPORTERS."""
+    out = []
+    for s in signals:
+        n = s.facts.get("reporters")
+        if s.source == "abuseipdb" and s.status == "ok" and s.threat and n is not None and n < THIN_REPORTERS:
+            s = replace(s, threat=round(s.threat * n / THIN_REPORTERS, 3), facts={**s.facts, "thin_reports": True})
+        out.append(s)
+    return out
+
+
 def shared_infrastructure(signals: list[Signal]) -> tuple[list[Signal], str | None]:
     """CDN IPs are shared by many sites and contacted by everything, malware
     included, so OTX's contextual mentions say little about them."""
@@ -232,6 +246,8 @@ def adjustments(before: list[Signal], after: list[Signal], scanner: dict, shared
                 why.append(f"{scanner['label']} explains the {old.facts['scan_share']:.0%} that is scanning")
             if shared and new.source == "otx":
                 why.append("CDN address, where OTX mentions are mostly malware contacting it")
+            if new.facts.get("thin_reports"):
+                why.append(f"only {old.facts['reporters']} distinct reporters")
             out.append({"beacon": old.name, "field": "threat", "from": old.threat, "to": new.threat,
                         "why": "; ".join(why)})
         if new.confidence != old.confidence:
@@ -283,6 +299,7 @@ def missing_beacons(signals: list[Signal]) -> list[dict]:
 def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     original = signals
+    signals = thin_reports(signals)
     signals, scanner = explain_scanning(signals)
     signals, shared = shared_infrastructure(signals)
     veneer = detect_veneer(signals, now)

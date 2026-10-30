@@ -170,6 +170,10 @@ The 2026-10-30 rescore added OTX pulse roles: benign flagged fell from 12% to 4%
 0.997, detection stayed at 97%, and no malicious IP's threat changed (to three decimals), and its paradox moved by at most 1.0 point. The cost isn't measured by this set: real C2
 servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
 
+A second 2026-10-30 rescore scaled AbuseIPDB's reading below 12 distinct reporters: benign flagged fell from
+4% to 0%, and no malicious IP's threat changed. A fresh sample of 85 IPs showed the limits. It cleared no false
+alarm there, and it weakened early signals on 2 of 30 IPs found on a single blocklist (see roadmap 1.6).
+
 **Research scanners.** Scanning blocklists also list research scanners, which are reported for
 doing what they say they do. The headline numbers stay strict and count every sampled IP as
 malicious. A secondary **scanner-aware** view sets aside IPs with a scanner label and reports them

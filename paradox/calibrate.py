@@ -30,6 +30,7 @@ import argparse
 import ipaddress
 import json
 import random
+import re
 import socket
 import sys
 import time
@@ -118,6 +119,8 @@ def build_signals(ip: str, saved: dict) -> list[Signal]:
     for s in others:   # scans saved before GreyNoise marked scanner labels (2026-10-29)
         if s.facts.get("benign_label", "").startswith("GreyNoise benign:"):
             s.facts.setdefault("label_kind", "scanner")
+        if s.source == "abuseipdb" and (m := re.search(r"by (\d+) users", s.summary)):
+            s.facts.setdefault("reporters", int(m[1]))   # scans saved before reporters was a fact
     return [sig] + others
 
 

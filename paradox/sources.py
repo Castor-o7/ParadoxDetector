@@ -395,6 +395,7 @@ def check_abuseipdb(ip: str, sig: Signal) -> None:
     reporters = d.get("numDistinctUsers") or 0
     sig.threat = score / 100
     sig.confidence = round(min(1.0, 0.4 + reporters / 20), 3)
+    sig.facts["reporters"] = reporters
     sig.last_seen = iso_date(parse_dt(d.get("lastReportedAt")))
     sig.link = f"https://www.abuseipdb.com/check/{ip}"
     sig.summary = f"Abuse confidence {score}% from {d.get('totalReports', 0)} reports by {reporters} users (90d)"
