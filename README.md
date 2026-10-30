@@ -176,12 +176,12 @@ them. Labels never come from the score's own inputs:
   out.
 - **Benign:** public DNS resolvers and the front-end IPs of major sites.
 
-The 2026-10-30 rescore added OTX pulse roles: benign flagged fell from 12% to 4%, AUC rose from 0.995 to
+The 2026-10-30 rescore, without VirusTotal (see the note below), added OTX pulse roles: benign flagged fell from 12% to 4%, AUC rose from 0.995 to
 0.997, detection stayed at 97%, and no malicious IP's threat changed (to three decimals), and its paradox moved by at most 1.0 point. The cost isn't measured by this set: real C2
 servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
 
 AbuseIPDB's reading now scales down below 12 distinct reporters, unless the latest report is within 3 days,
-so a fresh early warning keeps its full weight. On 2026-10-30 this cleared Netflix (paradox 25.5 to 13.7), while
+so a fresh early warning keeps its full weight. On 2026-10-30, without VirusTotal, this cleared Netflix (paradox 25.5 to 13.7), while
 AdGuard stayed at Mild tension because its latest report was a day old. Both depend on report timing, so these numbers
 change with the day of the rescore (see roadmap 1.6).
 
@@ -192,16 +192,33 @@ as their own class, with the detector's verdict on each: `explained` (a known sc
 scanning), `veneer` (doing more than scanning) or `unexplained`. The scanner label is itself a score
 input, so the scanner-aware view would hide the scanner rule's cost if it replaced the strict one.
 On the 2026-10-29 data it found Shodan (via GreyNoise and reverse DNS) and Palo Alto Xpanse (via
-GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 100%.
+GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 100%. That was without VirusTotal.
+With it on, both scanners read as `veneer` instead (see the note below).
 
 Raw OTX responses are saved, so OTX settings (`OTX_*` in `paradox/sources.py`) and the scoring weights
 can be re-tested offline with `--rescore`, with no API calls. `--refresh <beacon ...>` re-runs
 just those beacons on the saved scans, keeping the old reading wherever a call fails. If OTX starts rate-limiting, the run
 stops early and fills in the gaps next time.
 
-Results (30 malicious, 25 benign IPs):
+> **These figures were measured without a VirusTotal key.** Please read them with this note.
+>
+> With VirusTotal on, most paradoxes on known-malicious IPs fall away, because they partly reflected the missing
+> source. Malicious IPs at paradox 35+ went from 28 of 30 to 4 of 30 on these 55 IPs, and from 28 of 30 to 16 of 30
+> on a fresh sample of established malicious IPs. Two of those 4 are known scanners, described below.
+>
+> Detection with VirusTotal on was 100% and AUC 1.000 (2026-10-30, after PR #21, excluding vendors that overlap the
+> labels; ThreatFox had no key and GreyNoise errored on 20 of the 55). **That is not a clean headline.** The remaining
+> vendors are closed, so their independence from the labels can't be shown, and these are one day's small samples.
+>
+> Known limits with VirusTotal on:
+> - Known scanners read as `veneer`, because vendor reports aren't recognized as scanning. Shodan's scanner goes from
+>   threat 0.14 to 0.85.
+> - An attacker known to only one vendor, and nothing else, reads Likely benign. This cost is unmeasured.
+> - Benign flagged is 4% on these 55 IPs and 1 of 25 on the fresh sample.
 
-| | Run 1 (no keys) | Run 3 (AbuseIPDB, OTX down) | Run 4 (all live) | Run 5 (scanner + CDN rules) | Latest (2026-10-30 rescore) |
+Results (30 malicious, 25 benign IPs), without VirusTotal:
+
+| | Run 1 (no keys) | Run 3 (AbuseIPDB, OTX down) | Run 4 (all live) | Run 5 (scanner + CDN rules) | Latest without VirusTotal (2026-10-30 rescore) |
 |---|---|---|---|---|---|
 | Ranking (AUC) | 0.95 | 1.00 | 1.00 | 0.995 | 0.999 |
 | Malicious detected | 97% | 100% | 100% | 97% | 97% |
