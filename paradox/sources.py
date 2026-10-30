@@ -535,6 +535,11 @@ def check_internetdb(ip: str, sig: Signal) -> None:
 
 ECHO_ENGINES = re.compile(r"alienvault|abuse\.?ch|feodo|threatfox|urlhaus|spamhaus|greynoise|abuseipdb",
                           re.IGNORECASE)
+# Vendors built on the blocklists that calibration draws its malicious labels from
+# (NEIGHBOR_LISTS). Counting them would let the score grade itself. CINS Army and
+# EmergingThreats are those lists; IPsum aggregates public lists and held 85-99%
+# of each one on 2026-10-30.
+LABEL_SOURCE_ENGINES = re.compile(r"^(cins army|emergingthreats|ipsum)$", re.IGNORECASE)
 
 
 def check_virustotal(ip: str, sig: Signal) -> None:
@@ -546,7 +551,8 @@ def check_virustotal(ip: str, sig: Signal) -> None:
     # VirusTotal's vendor list includes feeds this app already queries directly
     # (AlienVault, abuse.ch, Spamhaus, ...). Counting them again would let one
     # observation vote twice, so only independent vendors are scored.
-    independent = {name: r for name, r in results.items() if not ECHO_ENGINES.search(name)}
+    independent = {name: r for name, r in results.items()
+                   if not ECHO_ENGINES.search(name) and not LABEL_SOURCE_ENGINES.search(name)}
     echoed = sorted(name for name, r in results.items()
                     if name not in independent and r.get("category") in ("malicious", "suspicious"))
     if results:
@@ -561,7 +567,7 @@ def check_virustotal(ip: str, sig: Signal) -> None:
     sig.link = f"https://www.virustotal.com/gui/ip-address/{ip}"
     sig.summary = f"{mal} malicious / {sus} suspicious of {engines} independent vendors"
     if echoed:
-        sig.evidence.append("Not double-counted (queried directly): " + ", ".join(echoed))
+        sig.evidence.append("Not double-counted (queried directly or calibration labels): " + ", ".join(echoed))
     if attrs.get("as_owner"):
         sig.evidence.append(f"AS owner: {attrs['as_owner']}")
 
