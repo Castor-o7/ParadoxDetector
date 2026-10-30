@@ -201,12 +201,15 @@ stops early and fills in the gaps next time.
 
 Results (30 malicious, 25 benign IPs):
 
-| | Run 1 (no keys) | Run 3 (AbuseIPDB, OTX down) | Run 4 (all live) | Run 5 (scanner + CDN rules) |
-|---|---|---|---|---|
-| Ranking (AUC) | 0.95 | 1.00 | 1.00 | 0.995 |
-| Malicious detected | 97% | 100% | 100% | 97% |
-| Benign flagged | 56% | 4% | 16% | 12% |
-| Benign with paradox ≥ 35 | 28% | 0% | 4% | 0% |
+| | Run 1 (no keys) | Run 3 (AbuseIPDB, OTX down) | Run 4 (all live) | Run 5 (scanner + CDN rules) | Latest (2026-10-30 rescore) |
+|---|---|---|---|---|---|
+| Ranking (AUC) | 0.95 | 1.00 | 1.00 | 0.995 | 0.999 |
+| Malicious detected | 97% | 100% | 100% | 97% | 97% |
+| Benign flagged | 56% | 4% | 16% | 12% | 0% |
+| Benign with paradox ≥ 35 | 28% | 0% | 4% | 0% | 0% |
+
+The latest column includes OTX pulse roles and the AbuseIPDB reporter rule, whose numbers were tuned on these
+same IPs. Saved scans age against the day of the rescore, so it won't reproduce exactly later (roadmap 3.6).
 
 Run 4 had OTX, AbuseIPDB and keyed GreyNoise live (GreyNoise's community tier still returned 429
 on 20 of 55 scans). Four of its five benign flags come from OTX alone, on Quad9, Google, GitHub
@@ -235,8 +238,7 @@ What calibration changed:
 
 Caveats: OTX's keyless quota ran out during run 3, so the OTX changes were checked on saved responses
 for 8 IPs rather than all 55. GreyNoise was rate-limited throughout. Run again with `OTX_API_KEY` and
-`GREYNOISE_API_KEY` set for a full picture. GitHub, Quad9 and Microsoft still score "Mild tension",
-which is defensible because malware really does use them.
+`GREYNOISE_API_KEY` set for a full picture.
 
 ### Source independence
 
@@ -320,7 +322,7 @@ assistant can call. It speaks MCP over stdio using only the standard library.
 | `scan_ip` | Full paradox report for one IP |
 | `scan_log` | Rank the IPs in log text or a local log file |
 | `ip_history` | Recorded scans and measured beacon lag |
-| `beacon_status` | Which beacons are configured and which keys are set |
+| `beacon_status` | Which beacons are configured, which keys are set, and how each last answered |
 
 **Threat model for agents.** Beacon text is written by third parties, possibly the attacker being
 investigated, so treat it as data:
@@ -437,4 +439,5 @@ paradox/env.example   keys file template (paradox init)
 pyproject.toml        packaging; installs the `paradox` command
 Dockerfile, docker-compose.yml   container deployment (serve + watch)
 examples/             sample log for trying batch mode
+docs/                 README banner and screenshot
 ```
