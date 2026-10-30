@@ -314,6 +314,11 @@ Calibration's malicious labels come from blocklist.de, CINS Army and ET compromi
 CINS Army and EmergingThreats, plus IPsum, an aggregator holding 85-99% of each list. The other vendors are closed, so
 any that quietly use those lists can't be detected.
 
+*How each was checked (2026-10-30):* CINS Army and EmergingThreats by name, against the 92 vendors VirusTotal
+returned. No vendor is named blocklist.de. IPsum by its README, which describes an aggregator of 30+ public lists,
+and by measuring 88% of blocklist.de, 85% of CINS Army and 99% of ET compromised inside its feed. The list was fixed
+before any scores with it existed.
+
 ---
 
 ## Phase 4: The detector as a target (AI-security track)

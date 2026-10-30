@@ -550,24 +550,24 @@ def check_virustotal(ip: str, sig: Signal) -> None:
     results = attrs.get("last_analysis_results") or {}
     # VirusTotal's vendor list includes feeds this app already queries directly
     # (AlienVault, abuse.ch, Spamhaus, ...). Counting them again would let one
-    # observation vote twice, so only independent vendors are scored.
+    # observation vote twice, so only independent vendors are scored. Vendors that
+    # overlap the calibration labels are left out too.
     independent = {name: r for name, r in results.items()
                    if not ECHO_ENGINES.search(name) and not LABEL_SOURCE_ENGINES.search(name)}
     echoed = sorted(name for name, r in results.items()
                     if name not in independent and r.get("category") in ("malicious", "suspicious"))
-    if results:
-        cats = [r.get("category") for r in independent.values()]
-        mal, sus, engines = cats.count("malicious"), cats.count("suspicious"), len(independent)
-    else:
-        stats = attrs.get("last_analysis_stats") or {}
-        mal, sus, engines = stats.get("malicious", 0), stats.get("suspicious", 0), sum(stats.values())
+    if not independent:
+        # Summary counts can't have vendors removed, and no data isn't a clean reading.
+        raise BeaconError("VirusTotal returned no per-vendor results to score")
+    cats = [r.get("category") for r in independent.values()]
+    mal, sus, engines = cats.count("malicious"), cats.count("suspicious"), len(independent)
     sig.threat = round(min(1.0, (mal + 0.5 * sus) / 5), 3)
     sig.confidence = 0.8
     sig.last_seen = iso_date(parse_dt(attrs.get("last_analysis_date")))
     sig.link = f"https://www.virustotal.com/gui/ip-address/{ip}"
     sig.summary = f"{mal} malicious / {sus} suspicious of {engines} independent vendors"
     if echoed:
-        sig.evidence.append("Not double-counted (queried directly or calibration labels): " + ", ".join(echoed))
+        sig.evidence.append("Not double-counted (queried directly or overlapping calibration labels): " + ", ".join(echoed))
     if attrs.get("as_owner"):
         sig.evidence.append(f"AS owner: {attrs['as_owner']}")
 
