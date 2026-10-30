@@ -245,13 +245,79 @@ It doubles as class material.
 
 ---
 
+## Phase 5: Show the analyst what the detector knows (UI/UX)
+
+The web UI (`paradox/web/index.html`) is one page with two modes: scan a single IP, or rank the
+IPs in a log. Each result shows a gauge, the evidence, a fast-vs-slow history chart for that IP,
+and the Claude summary. It hasn't changed since the app was packaged, while the engine has kept
+growing. These items catch the UI up, and give the views planned in other phases (1.5, 2.4, 3.3,
+4.2) a single place to live, so they don't each bolt a new panel onto the page.
+
+The rule for this phase: **the UI should never look more confident than the engine is.** A
+missing beacon, an unverified claim or a shared address should be visible, not left for the
+analyst to guess.
+
+### 5.1 Beacon health · S
+
+*The gap: a scan run while GreyNoise is rate-limited looks the same as one run with full data.*
+
+The server already serves `/api/beacons`, but the UI never calls it. Show which beacons are
+configured, which are keyless, which are missing a key, and which are rate-limited or failing
+right now. On each result, mark the beacons that didn't answer and say what that costs ("scanner
+label unavailable: GreyNoise quota spent").
+
+### 5.2 Watch view · S
+
+The server also serves `/api/tracked`, which the UI doesn't call either. Add a view of what
+`paradox watch` is following: each IP's last scan, its current paradox and direction, and how long
+the paradox has been open. This is where an analyst checks in each morning.
+
+### 5.3 History browser · M
+
+Today you see history only for the IP you just scanned. Add a list of every scanned IP that you
+can sort and filter by paradox score, veneer, direction and last-seen date, where clicking a row
+opens the chart that already exists. Later, 1.3's label-age timeline and 3.3's outcomes chart go
+here.
+
+### 5.4 Claims and how they were tested · S
+
+*Pairs with 1.5.*
+
+Results from FCrDNS (1.1) and published ranges (1.2) now arrive as ordinary beacon rows and veneer
+labels. Give each claimed identity its own line that says what the claim is, how it was tested and
+what came back: **confirmed** (the PTR resolves back to this IP, or the IP is on the operator's
+list), **unconfirmed** (the claim failed) or **untested** (no source could check it). Next to the
+1.5 ledger, this shows the analyst exactly which piece of paper turned out to be hollow.
+
+### 5.5 Calibration report page · M
+
+`paradox calibrate` output exists only in the terminal and in CI artifacts. Render the latest run
+in the UI with the strict and scanner-aware numbers side by side (3.2), the per-set results once
+3.1 exists, and the run-over-run change, so the cost of a scoring change can be seen at a glance
+(rule 4).
+
+### 5.6 Room for what's coming · M
+
+Restructure the single page into a few views (Scan, Log, Watch, History, Calibration) before the
+later items arrive: 2.3's "shared infrastructure" verdict, 2.4's cluster graph, and 4.2's flag
+when the model and the score disagree. Keep dark mode, the mobile layout and the labeled SVG charts
+the page already has.
+
+### 5.7 Usability check with real analysts · S
+
+Give two or three people (classmates work) concrete tasks: "Is this IP safe to unblock?", "Which
+log entry should you look at first?", "Why is this one a paradox?". Watch where they get stuck,
+and fix the top issues. Repeat after 5.6. It also doubles as class material.
+
+---
+
 ## Suggested order
 
 | When | Items | Why first |
 |---|---|---|
-| Now | ~~1.1, 1.2, 3.2~~ (done), 1.5 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise) |
-| Next | 1.3, 1.4, 3.1, 3.5, 4.1 | Close the known false positives, build adversarial and hiding-place test sets, and test the AI summarizer under attack |
-| Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4 | New unmasking signals plus self-measurement once history has accumulated |
+| Now | ~~1.1, 1.2, 3.2~~ (done), 1.5, 5.1 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
+| Next | 1.3, 1.4, 3.1, 3.5, 4.1, 5.2, 5.4 | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
 Items 3.3, 3.4 and 1.3 need weeks of history, so the most useful thing to start right away
