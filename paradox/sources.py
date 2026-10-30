@@ -72,7 +72,10 @@ def parse_dt(value) -> datetime | None:
     if value in (None, "", 0):
         return None
     if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value, tz=timezone.utc)
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
     text = str(value).strip().replace("Z", "+00:00").replace(" ", "T", 1)
     try:
         dt = datetime.fromisoformat(text)
@@ -877,5 +880,6 @@ def run_beacon(beacon: Beacon, ip: str) -> Signal:
         sig.status, sig.threat, sig.confidence = "error", None, 0.0
         sig.failure = getattr(exc, "failure", "error")
         sig.summary = str(exc) if isinstance(exc, BeaconError) else f"{type(exc).__name__}: {exc}"
+    sig.last_seen = iso_date(parse_dt(sig.last_seen))  # feeds supply this text; pass on only a real date
     sig.latency_ms = int((time.monotonic() - start) * 1000)
     return sig
