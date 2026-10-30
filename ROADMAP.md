@@ -306,9 +306,9 @@ checked on every PR.
 Saved scans are aged against today's date, so recency rules such as 1.6's window and the veneer's freshness check
 give different results depending on the day of the rescore, and a past result can't be reproduced.
 
-### 3.7 Keep VirusTotal out of its own grading · S
+### 3.7 Keep VirusTotal out of its own grading · S · ✅ shipped
 
-- [ ] **PDX-31: Exclude label-source vendors from VirusTotal.** Done when: VirusTotal's reading ignores vendors that overlap the calibration label sources, a test pins the exclusion list, how each was checked is written down, and a report gives detection, benign flagged, malicious with paradox 35+, mean paradox and the named IPs with VirusTotal off, on, and on with the exclusion.
+- [x] **PDX-31: Exclude label-source vendors from VirusTotal.** Done when: VirusTotal's reading ignores vendors that overlap the calibration label sources, a test pins the exclusion list, how each was checked is written down, and a report gives detection, benign flagged, malicious with paradox 35+, mean paradox and the named IPs with VirusTotal off, on, and on with the exclusion.
 
 Calibration's malicious labels come from blocklist.de, CINS Army and ET compromised, and VirusTotal's vendors include
 CINS Army and EmergingThreats, plus IPsum, an aggregator holding 85-99% of each list. The other vendors are closed, so
@@ -478,7 +478,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 3.7, 4.1, 4.5, ~~1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, 4.5, ~~3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
