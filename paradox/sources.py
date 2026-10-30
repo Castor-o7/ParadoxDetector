@@ -72,7 +72,10 @@ def parse_dt(value) -> datetime | None:
     if value in (None, "", 0):
         return None
     if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value, tz=timezone.utc)
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
     text = str(value).strip().replace("Z", "+00:00").replace(" ", "T", 1)
     try:
         dt = datetime.fromisoformat(text)
