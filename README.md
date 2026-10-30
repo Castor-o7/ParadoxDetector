@@ -181,7 +181,7 @@ The 2026-10-30 rescore, without VirusTotal (see the note below), added OTX pulse
 servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
 
 AbuseIPDB's reading now scales down below 12 distinct reporters, unless the latest report is within 3 days,
-so a fresh early warning keeps its full weight. On 2026-10-30 this cleared Netflix (paradox 25.5 to 13.7), while
+so a fresh early warning keeps its full weight. On 2026-10-30, without VirusTotal, this cleared Netflix (paradox 25.5 to 13.7), while
 AdGuard stayed at Mild tension because its latest report was a day old. Both depend on report timing, so these numbers
 change with the day of the rescore (see roadmap 1.6).
 
@@ -192,8 +192,8 @@ as their own class, with the detector's verdict on each: `explained` (a known sc
 scanning), `veneer` (doing more than scanning) or `unexplained`. The scanner label is itself a score
 input, so the scanner-aware view would hide the scanner rule's cost if it replaced the strict one.
 On the 2026-10-29 data it found Shodan (via GreyNoise and reverse DNS) and Palo Alto Xpanse (via
-GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 100%. That was without VirusTotal,
-and it changes with VirusTotal on (see the note below).
+GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 100%. That was without VirusTotal.
+With it on, both scanners read as `veneer` instead (see the note below).
 
 Raw OTX responses are saved, so OTX settings (`OTX_*` in `paradox/sources.py`) and the scoring weights
 can be re-tested offline with `--rescore`, with no API calls. `--refresh <beacon ...>` re-runs
