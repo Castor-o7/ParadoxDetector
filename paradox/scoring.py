@@ -46,7 +46,7 @@ import math
 from dataclasses import replace
 from datetime import datetime, timezone
 
-from .sources import BEACONS, Signal, age_days, origin_of, parse_dt
+from .sources import BEACON_COST, BEACONS, Signal, age_days, origin_of, parse_dt
 
 WEIGHTS = {b.id: b.weight for b in BEACONS}
 PEAK_MIN_CONFIDENCE = 0.5
@@ -237,6 +237,13 @@ def adjustments(before: list[Signal], after: list[Signal], scanner: dict, shared
     return out
 
 
+def missing_beacons(signals: list[Signal]) -> list[dict]:
+    """Beacons that gave no reading, failures before unconfigured ones, and what that costs."""
+    gone = sorted((s for s in signals if s.status != "ok"), key=lambda s: s.status == "skipped")
+    return [{"beacon": s.name, "tier": s.tier, "status": s.status, "failure": s.failure,
+             "summary": s.summary, "cost": BEACON_COST.get(s.source, "")} for s in gone]
+
+
 def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     original = signals
@@ -355,6 +362,7 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
         "threat": round(threat, 3),
         "threat_label": threat_label(threat),
         "ledger": ledger,
+        "missing": missing_beacons(original),
         "fast": fast,
         "slow": slow,
         "gap": round(gap, 3),

@@ -52,6 +52,10 @@ def render(report: dict) -> str:
                          + ("  [ASN-DROP]" if nw.get("asn_drop") else "  [hosting]" if nw.get("hosting") else ""))
     if sc.get("ledger"):
         lines[-1:-1] = render_ledger(sc["ledger"])
+    if sc.get("missing"):
+        lines.insert(-1, "  No answer from:")
+        lines[-1:-1] = [f"    {m['beacon']} [{(m['failure'] or m['status']).replace('_', ' ')}]: {m['cost']}"
+                        for m in sc["missing"]]
     for tier in ("fast", "slow", "network", "context"):
         lines.append(f"  -- {tier.upper()} --")
         for s in (x for x in report["signals"] if x["tier"] == tier):

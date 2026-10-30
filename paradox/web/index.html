@@ -109,6 +109,13 @@ table.logres td.n { font-family: var(--mono); text-align: right; white-space: no
 table.logres td.ip a { font-family: var(--mono); color: var(--accent); cursor: pointer; }
 table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .tablewrap { overflow-x: auto; }
+.veneer.gaps { border-color: var(--line); border-left-color: var(--warn); color: var(--muted); }
+.veneer.gaps b { color: var(--warn); }
+.health { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+.health summary { margin: 0; color: var(--muted); }
+.health summary b { color: var(--warn); font-weight: 600; }
+.health table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.health td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .ledger { margin-top: 16px; }
 .ledger .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 28px; margin-top: 8px; }
 .ledger h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -131,6 +138,8 @@ table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
       (curated blocklists, vendor consensus, scan data). A high paradox score means the fast beacons see a
       threat the slow ones haven't caught up with yet.</p>
   </header>
+
+  <details class="health" id="health"></details>
 
   <div class="modes" role="group" aria-label="Mode">
     <button type="button" id="m-ip" aria-pressed="true">Single IP</button>
@@ -180,13 +189,16 @@ function meter(v, color) {
   return `<div class="meter"><span style="width:${v == null ? 0 : Math.max(2, v * 100)}%;background:${color}"></span></div>`;
 }
 
+const FAILURES = {no_key: "no API key", rate_limited: "rate limited", bad_key: "key rejected", error: "failed"};
+const failureText = x => FAILURES[x.failure] ?? x.status;
+
 function card(s) {
   const scored = s.tier !== "context";
   const dim = s.status !== "ok";
   const title = s.link ? `<a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name);
   const score = !scored ? "" : s.status === "ok"
     ? `<span class="score" style="color:${threatColor(s.threat)}">${pct(s.threat)}</span>`
-    : `<span class="tag" style="color:${s.status === "error" ? "var(--bad)" : "var(--muted)"}">${esc(s.status)}</span>`;
+    : `<span class="tag" style="color:${s.status === "error" ? "var(--bad)" : "var(--muted)"}">${esc(failureText(s))}</span>`;
   const meta = [];
   if (scored && s.status === "ok") meta.push(`confidence ${pct(s.confidence)}%`);
   if (s.last_seen) meta.push(`last seen ${esc(s.last_seen)}`);
@@ -215,6 +227,37 @@ function veneerBox(v, scanner) {
     <span>(not contradicted by fresh threat activity)</span></div>`;
   return `<div class="veneer"><b>Reputation veneer</b>: ${v.labels.map(esc).join("; ")} vouches for this IP, but these beacons report fresh threat activity:
     <ul>${v.contradicted_by.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+}
+
+function gapsBox(missing) {
+  if (!missing?.length) return "";
+  const failed = missing.filter(m => m.status === "error").length, off = missing.length - failed;
+  const head = [failed && `${failed} failed`, off && `${off} not configured`].filter(Boolean).join(", ");
+  return `<div class="veneer gaps"><b>${missing.length} beacon${missing.length === 1 ? "" : "s"} gave no reading</b> (${head}), so this result is less certain:
+    <ul>${missing.map(m => `<li>${esc(m.beacon)} (${esc(failureText(m))}): ${esc(m.cost)}</li>`).join("")}</ul></div>`;
+}
+
+const HEALTH = {ok: "answering", no_key: "missing a key", rate_limited: "rate limited", bad_key: "key rejected",
+                error: "failing", untested: "not tried yet"};
+
+async function loadHealth() {
+  const box = $("#health");
+  try {
+    const res = await fetch("/api/beacons");
+    const rows = await res.json();
+    if (!res.ok) throw new Error(rows.error);
+    const count = s => rows.filter(b => b.state === s).length;
+    const parts = ["ok", "untested", "no_key"].filter(count).map(s => `${count(s)} ${HEALTH[s]}`);
+    const bad = ["rate_limited", "bad_key", "error"].filter(count).map(s => `<b>${count(s)} ${HEALTH[s]}</b>`);
+    const open = box.open;
+    box.innerHTML = `<summary>${rows.length} beacons: ${[...bad, ...parts].join(", ")}</summary>
+      <div class="tablewrap"><table><tbody>${rows.map(b => `<tr><td>${esc(b.name)}</td><td>${esc(b.tier)}</td>
+        <td>${esc(HEALTH[b.state] ?? b.state)}${b.detail ? `: ${esc(b.detail)}` : ""}</td>
+        <td>${b.checked_at ? esc(fmtTime(b.checked_at)) : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    box.open = open;
+  } catch (e) {
+    box.innerHTML = `<summary class="err">Could not load beacon status: ${esc(e.message)}</summary>`;
+  }
 }
 
 function ledgerColumn(title, rows, total) {
@@ -247,6 +290,7 @@ function render(r) {
           <span style="font-family:var(--mono);margin-left:8px">${esc(r.ip)}</span>
           <p class="explain">${esc(sc.explanation)}</p></div>
         ${veneerBox(sc.veneer, sc.scanner)}
+        ${gapsBox(sc.missing)}
         <div class="tierrow"><span class="name" style="color:var(--fast)">Fast beacons</span>${meter(sc.fast.score, "var(--fast)")}<span class="val">${pct(sc.fast.score)}</span></div>
         <div class="tierrow"><span class="name" style="color:var(--slow)">Slow beacons</span>${meter(sc.slow.score, "var(--slow)")}<span class="val">${pct(sc.slow.score)}</span></div>
         <div class="tierrow"><span class="name">Overall threat</span>${meter(sc.threat, threatColor(sc.threat))}<span class="val">${pct(sc.threat)}</span></div>
@@ -412,7 +456,7 @@ async function scan(ip) {
     const res = await fetch(`/api/scan?ip=${encodeURIComponent(ip)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    current = data.ip; render(data);
+    current = data.ip; render(data); loadHealth();
     history.replaceState(null, "", `?ip=${encodeURIComponent(data.ip)}`);
   } catch (e) {
     $("#out").innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
@@ -480,7 +524,7 @@ async function scanLog(text, limit) {
       }
     }
     if (job.state === "error") throw new Error(job.error);
-    out.innerHTML = logResults(job.result);
+    out.innerHTML = logResults(job.result); loadHealth();
     out.querySelectorAll("td.ip a").forEach(a => a.onclick = () => { setMode(false); $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
   } catch (e) {
     out.innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
@@ -495,6 +539,7 @@ $("#lf").onsubmit = e => {
 };
 $("#f").onsubmit = e => { e.preventDefault(); scan($("#ip").value.trim()); };
 document.querySelectorAll(".examples a").forEach(a => a.onclick = () => { $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
+loadHealth();
 const initial = new URLSearchParams(location.search).get("ip");
 if (initial) { $("#ip").value = initial; scan(initial); }
 </script>

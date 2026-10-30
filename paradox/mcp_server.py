@@ -81,7 +81,8 @@ TOOLS = [
     {
         "name": "beacon_status",
         "title": "List beacons and API key status",
-        "description": "Which beacons are configured, their tier, and whether each needed API key is set.",
+        "description": ("Which beacons are configured, their tier, whether each needed API key is set, and "
+                        "how each last answered in this process (ok, rate_limited, bad_key, error, untested)."),
         "inputSchema": {"type": "object", "properties": {}},
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
@@ -102,6 +103,7 @@ def compact(report: dict) -> dict:
         "fast_tier": sc["fast"]["score"], "slow_tier": sc["slow"]["score"], "coverage": sc["coverage"],
         "explanation": sc["explanation"],
         "ledger": sc["ledger"],
+        "missing": sc["missing"],
         "veneer": sc["veneer"],
         "network": sc["network"],
         "note": UNTRUSTED,
