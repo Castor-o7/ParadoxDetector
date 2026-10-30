@@ -23,7 +23,7 @@ Four rules carry over from the work so far, and every item below has to respect 
 Effort: **S** is about a day, **M** a few days, **L** a week or more.
 
 Each item has a permanent story ID (`PDX-n`) and a "done when" line for the
-[Muster board](https://github.com/Castor-o7/muster/pull/2). A checked box means shipped, not verified.
+[Muster board](https://github.com/Castor-o7/muster/blob/main/docs/board.md). A checked box means shipped, not verified.
 The watchman keeps each story's state.
 
 ---
@@ -207,7 +207,7 @@ own class. This stops a correct "known scanner" verdict from counting as a miss.
 
 ### 3.3 Did the paradox come true? · M
 
-- [ ] **PDX-13: Did the paradox come true?.** Done when: `paradox calibrate --outcomes` reports how often and how fast slow beacons caught up, and the web UI's history shows it in a chart.
+- [ ] **PDX-13: Did the paradox come true?** Done when: `paradox calibrate --outcomes` reports how often and how fast slow beacons caught up, and the web UI's history shows it in a chart.
 
 The detector makes testable predictions. An **emerging** paradox says the slow tier will
 eventually agree. With history, score each past prediction: how often did slow sources catch up,
