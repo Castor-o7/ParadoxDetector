@@ -6,6 +6,7 @@ silently drift.
 
 import json
 import socket
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,6 +111,35 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(calibrate.auc([0.1], [0.9]), 0.0)
         self.assertEqual(calibrate.auc([0.5], [0.5]), 0.5)
 
+    def test_scanners_get_their_own_class_but_strict_numbers_stay_headline(self):
+        def scan(threat, scanner=False, scan_share=None):
+            sigs = [Signal(source="abuseipdb", name="AbuseIPDB", tier="fast", threat=threat, confidence=1.0,
+                           last_seen="2026-10-28", facts={"scan_share": scan_share} if scan_share else {}),
+                    Signal(source="spamhaus", name="DROP", tier="slow", threat=0.0, confidence=0.5)]
+            if scanner:
+                sigs.append(Signal(source="rdns", name="Reverse DNS identity", tier="context",
+                                   facts={"benign_label": "rDNS: Shodan scanner", "label_kind": "scanner"}))
+            return sigs
+        labels = {"malicious": ["45.1.1.1", "45.1.1.2"], "benign": ["8.8.8.8"]}
+        ev = calibrate.evaluate(labels, {"45.1.1.1": scan(1.0), "45.1.1.2": scan(1.0, True, 0.95),
+                                         "8.8.8.8": scan(0.0)})
+        self.assertEqual(ev["detection_rate"], 0.5)                 # strict: the scanner is a miss
+        self.assertEqual(ev["scanner_aware"]["detection_rate"], 1.0)
+        self.assertEqual(ev["scanners"][0]["verdict"], "explained")
+        self.assertEqual(ev["scanners"][0]["identified_by"], ["Reverse DNS identity"])
+
+    def test_refresh_adds_beacons_newer_than_the_scan(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "45.1.1.1.json"
+            path.write_text(json.dumps({"signals": [{"source": "tor", "name": "Tor", "tier": "context"}],
+                                        "otx_raw": None, "otx_error": None}))
+            fresh = Signal(source="rdns", name="Reverse DNS identity", tier="context", summary="No reverse DNS")
+            with mock.patch.object(calibrate, "SCANS", Path(d)), \
+                 mock.patch.object(calibrate, "run_beacon", return_value=fresh), \
+                 mock.patch("sys.stderr"):
+                calibrate.refresh(["45.1.1.1"], ["rdns"], pause=0)
+            self.assertEqual([s["source"] for s in json.loads(path.read_text())["signals"]], ["tor", "rdns"])
+
     def test_malicious_labels_exclude_score_inputs(self):
         lists = {"blocklist.de": ["45.1.1.1", "45.1.1.2", "45.1.1.3", "10.0.0.1"],
                  "CINS Army": ["45.1.1.1", "45.1.1.2", "45.1.1.3", "10.0.0.1"],
@@ -159,6 +189,44 @@ class ReverseDnsTests(unittest.TestCase):
         with mock.patch.object(sources, "_resolve", side_effect=sources.FuturesTimeout()), \
              self.assertRaises(sources.BeaconError):
             sources.check_rdns("45.1.1.1", sig)
+
+class PublishedRangeTests(unittest.TestCase):
+    GOOGLE = json.dumps({"creationTime": "2026-10-29", "prefixes": [
+        {"ipv4Prefix": "66.249.66.0/27"}, {"ipv6Prefix": "2001:4860:4801:10::/64"},
+        {"ipv4Prefix": "10.0.0.0/8"}, {"ipv4Prefix": "not-a-range"}]}).encode()
+    CENSYS = ("<p>Censys scans from:</p><code>162.142.125.0/24\n167.94.138.0/24\n167.94.145.0/24\n"
+              "167.94.146.0/24\n199.45.154.0/24\n2602:80d:1003::/112\nAS398722</code>"
+              "<a href='/v1.2.3.4/docs'>v1.2</a> see 1.0.0.0/8").encode()
+
+    def test_json_feed_keeps_valid_public_ranges(self):
+        self.assertEqual(sources.parse_ranges("json", self.GOOGLE),
+                         ["2001:4860:4801:10::/64", "66.249.66.0/27"])   # private and junk dropped
+
+    def test_html_page_ranges_are_validated(self):
+        nets = sources.parse_ranges("html", self.CENSYS)
+        self.assertIn("2602:80d:1003::/112", nets)
+        self.assertNotIn("1.0.0.0/8", nets)                     # too broad for anyone to own
+        self.assertEqual(len(nets), 6)
+
+    def test_html_page_that_changed_shape_is_refused(self):
+        with self.assertRaises(sources.BeaconError):
+            sources.parse_ranges("html", b"<p>We moved our list to 162.142.125.0/24</p>")
+
+    def test_membership_is_a_label(self):
+        lists = {"Googlebot": ["66.249.66.0/27"], "Censys": ["162.142.125.0/24"]}
+        def published(operator, fmt, url):
+            if operator not in lists:
+                raise sources.BeaconError("down")
+            return lists[operator]
+        with mock.patch.object(sources, "_published", side_effect=published):
+            sig = Signal(source="published", name="p", tier="context")
+            sources.check_published("162.142.125.10", sig)
+            self.assertEqual(sig.facts["label_kind"], "scanner")
+            self.assertIn("Censys", sig.facts["benign_label"])
+            miss = Signal(source="published", name="p", tier="context")
+            sources.check_published("45.1.1.1", miss)
+            self.assertIn("unavailable: Bingbot", miss.summary)  # partial outage is reported, not fatal
+
 
 if __name__ == "__main__":
     unittest.main()

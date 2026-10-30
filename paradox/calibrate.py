@@ -13,6 +13,13 @@ Labels must not come from the score's own inputs, or the test grades itself:
   (direct inputs) are left out.
 * benign: public DNS resolvers and the front-end IPs of major sites.
 
+Scanning blocklists also list research scanners (Shodan, Censys...), which are
+reported for doing exactly what they say. The headline numbers stay *strict*:
+every sampled IP counts as malicious. A second, *scanner-aware* view sets aside
+IPs with a scanner label and reports them as their own class. That label is
+itself a score input, so the scanner-aware view is never the headline: it
+would hide the scanner rule's cost if it replaced the strict one.
+
 Raw beacon results are saved per IP, so weights in scoring.py can be tuned and
 re-scored offline (--rescore) without hitting the APIs again.
 """
@@ -156,8 +163,8 @@ def refresh(ips: list[str], beacon_ids: list[str], pause: float) -> None:
         saved = json.loads(path.read_text())
         for b in chosen:
             new = run_beacon(b, ip)
-            if new.status == "ok":
-                saved["signals"] = [new.to_dict() if s["source"] == b.id else s for s in saved["signals"]]
+            if new.status == "ok":   # replace the saved reading, or add a beacon newer than the scan
+                saved["signals"] = [s for s in saved["signals"] if s["source"] != b.id] + [new.to_dict()]
             else:
                 print(f"  {ip}: {b.id} {new.status}, keeping saved reading", file=sys.stderr)
         path.write_text(json.dumps(saved))
@@ -179,9 +186,12 @@ def evaluate(labels: dict, scans: dict[str, list[Signal]]) -> dict:
         for ip in labels[cls]:
             if ip in scans:
                 sc = scoring.compute(scans[ip])
+                scanner_by = sorted({s.name for s in scans[ip]
+                                     if s.status == "ok" and s.facts.get("label_kind") == "scanner"})
                 rows.append({"ip": ip, "label": cls, "threat": sc["threat"], "paradox": sc["paradox"],
                              "direction": sc["direction"], "network_risk": sc["network"]["risk"],
-                             "signals": scans[ip]})
+                             "scanner_by": scanner_by, "explained": sc["scanner"]["explained"],
+                             "veneer": sc["veneer"]["active"], "signals": scans[ip]})
     bad = [r for r in rows if r["label"] == "malicious"]
     good = [r for r in rows if r["label"] == "benign"]
     flag = lambda r: r["threat"] >= 0.15   # "Suspicious" or worse
@@ -198,6 +208,20 @@ def evaluate(labels: dict, scans: dict[str, list[Signal]]) -> dict:
                 b["hit_" + r["label"]] += 1
 
     mean = lambda xs: round(sum(xs) / len(xs), 3) if xs else None
+    scanners = [r for r in bad if r["scanner_by"]]
+    unlabeled = [r for r in bad if not r["scanner_by"]]
+    scanner_aware = {
+        "malicious": len(unlabeled),
+        "threat_auc": auc([r["threat"] for r in unlabeled], [r["threat"] for r in good]),
+        "detection_rate": mean([flag(r) for r in unlabeled]),
+        "misses": [r["ip"] for r in unlabeled if not flag(r)],
+    }
+    scanner_class = [{
+        "ip": r["ip"], "identified_by": r["scanner_by"], "threat": r["threat"], "paradox": r["paradox"],
+        # What the detector should say about a scanner: either "known scanner doing scanning" or,
+        # if it is doing more than scanning, a veneer.
+        "verdict": "veneer" if r["veneer"] else "explained" if r["explained"] else "unexplained",
+    } for r in scanners]
     return {
         "counts": {"malicious": len(bad), "benign": len(good)},
         "threat_auc": auc([r["threat"] for r in bad], [r["threat"] for r in good]),
@@ -209,6 +233,8 @@ def evaluate(labels: dict, scans: dict[str, list[Signal]]) -> dict:
         "benign_false_paradox": mean([r["paradox"] >= 35 for r in good]),
         "paradox_mean": {"malicious": mean([r["paradox"] for r in bad]),
                          "benign": mean([r["paradox"] for r in good])},
+        "scanner_aware": scanner_aware,
+        "scanners": scanner_class,
         "beacons": beacons,
         "misses": sorted(((r["ip"], r["threat"]) for r in bad if not flag(r)), key=lambda x: x[1]),
         "false_alarms": [(r["ip"], r["threat"], r["paradox"]) for r in good
@@ -240,6 +266,16 @@ def render(ev: dict) -> str:
     if ev["misses"]:
         lines += ["", f"  Malicious IPs rated Likely benign: {len(ev['misses'])} "
                       f"(e.g. {', '.join(ip for ip, _ in ev['misses'][:5])})"]
+    if ev["scanners"]:
+        sa = ev["scanner_aware"]
+        sa_auc = "n/a" if sa["threat_auc"] is None else f"{sa['threat_auc']:.3f}"
+        lines += ["", f"  Research scanners in the malicious sample: {len(ev['scanners'])} (scanner label from "
+                      "a score input, so this view is secondary)"]
+        lines += [f"    {r['ip']:<18} {r['verdict']:<12} threat {r['threat']:.2f}  paradox {r['paradox']:.0f}  "
+                  f"via {', '.join(r['identified_by'])}" for r in ev["scanners"]]
+        lines += [f"  Scanner-aware: {sa['malicious']} malicious, AUC {sa_auc}, "
+                  f"detection {pct(sa['detection_rate'])}"
+                  + (f", misses {', '.join(sa['misses'])}" if sa["misses"] else "")]
     return "\n".join(lines) + "\n"
 
 

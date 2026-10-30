@@ -41,7 +41,7 @@ What the 2026-10-29 calibration (run 5) and the live tests showed, which sets th
 
 ## Phase 1: Sharpen what exists
 
-### 1.1 Verify claimed identities (forward-confirmed reverse DNS) · S
+### 1.1 Verify claimed identities (forward-confirmed reverse DNS) · S · ✅ shipped (#5)
 
 *The paper tiger: an IP whose reverse DNS says `scanner.shodan.io`.*
 
@@ -55,7 +55,11 @@ when GreyNoise is rate-limited.
 - **Measure:** run it on the calibration set; Shodan/Censys scanners should confirm. Add fixtures
   for a spoofed PTR.
 
-### 1.2 Published scanner ranges as a second scanner label · S
+### 1.2 Published scanner ranges as a second scanner label · S · ✅ shipped
+
+*Shipped:* Googlebot, Bingbot, Applebot and GPTBot JSON feeds and Censys's documented ranges.
+Shodan and Palo Alto Xpanse publish no public list. Xpanse shows its ranges only inside its customer
+console.
 
 Some research scanners publish their source ranges (Censys does, for one). Use those lists as a
 scanner label with its own origin, so the scanner rule doesn't hang on one rate-limited API, and
@@ -160,7 +164,11 @@ sets for the places attackers hide: phishing sites behind CDNs, C2 on major clou
 C2s on AWS, such as 50.16.16.211, which came up during testing), and Tor exits. Report results per set, not just
 overall.
 
-### 3.2 Cleaner labels · S
+### 3.2 Cleaner labels · S · ✅ shipped
+
+*Shipped as a separate class, not a removal:* identifying scanners with labels that are score
+inputs, then dropping them, would make the calibration grade itself (rule 3). The strict numbers
+stay the headline, and the scanner-aware view is reported beside them.
 
 Drop known research scanners from the malicious set (using 1.1 and 1.2), or score them as their
 own class. This stops a correct "known scanner" verdict from counting as a miss.
@@ -241,7 +249,7 @@ It doubles as class material.
 
 | When | Items | Why first |
 |---|---|---|
-| Now | 1.1, 1.2, 3.2, 1.5 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise) |
+| Now | ~~1.1, 1.2, 3.2~~ (done), 1.5 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise) |
 | Next | 1.3, 1.4, 3.1, 3.5, 4.1 | Close the known false positives, build adversarial and hiding-place test sets, and test the AI summarizer under attack |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4 | New unmasking signals plus self-measurement once history has accumulated |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |

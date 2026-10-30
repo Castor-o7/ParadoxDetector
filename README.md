@@ -92,6 +92,7 @@ Developing: `python3 -m unittest discover -s tests` (no keys or network needed).
 | network | Network (ASN) via RIPEstat | none | ASN owner, Spamhaus ASN-DROP (criminal-run networks), hosting heuristic |
 | context | RDAP, Tor exit list | none | Ownership and anonymizer status (not scored) |
 | context | Reverse DNS identity | none | Forward-confirmed reverse DNS: verifies (or catches forging of) a claimed operator identity |
+| context | Operator-published ranges | none | Address ranges that Googlebot, Bingbot, Applebot, GPTBot and Censys publish for their crawlers/scanners |
 
 Bulk feeds (Feodo, DROP, KEV, Tor) are cached in the app's home directory (`paradox where`).
 
@@ -123,6 +124,10 @@ Each beacon produces a **threat** reading (0–1) and a **confidence** (0–1). 
      (`IDENTITY_DOMAINS` in `paradox/sources.py`) is a label. It gives the scanner rule a second
      source, so it keeps working when GreyNoise is rate-limited. A claim that doesn't resolve back
      is a **forged identity**: it triggers the veneer and sets a "Suspicious" threat floor.
+     Operators that publish their ranges (`PUBLISHED_RANGES`) give a third source: an IP inside
+     Censys's published list is a Censys scanner label. Lists are cached for a day, and a list that
+     fails to load is reported but doesn't fail the scan. Shodan and Palo Alto Xpanse publish no
+     public list, so Shodan relies on reverse DNS and Xpanse on GreyNoise alone.
    - **Labels never discount their own contradiction.** A GreyNoise RIOT "business service" label
      does not weaken OTX, or the veneer would protect itself.
    - **Shared infrastructure.** On AbuseIPDB "Content Delivery Network" addresses (GitHub,
@@ -160,6 +165,15 @@ them. Labels never come from the score's own inputs:
   feed the neighborhood check, which excludes the IP itself. IPs on Feodo or Spamhaus DROP are left
   out.
 - **Benign:** public DNS resolvers and the front-end IPs of major sites.
+
+**Research scanners.** Scanning blocklists also list research scanners, which are reported for
+doing what they say they do. The headline numbers stay strict and count every sampled IP as
+malicious. A secondary **scanner-aware** view sets aside IPs with a scanner label and reports them
+as their own class, with the detector's verdict on each: `explained` (a known scanner doing
+scanning), `veneer` (doing more than scanning) or `unexplained`. The scanner label is itself a score
+input, so the scanner-aware view would hide the scanner rule's cost if it replaced the strict one.
+On the 2026-10-29 data it found Shodan (via GreyNoise and reverse DNS) and Palo Alto Xpanse (via
+GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 100%.
 
 Raw OTX responses are saved, so OTX settings (`OTX_*` in `paradox/sources.py`) and the scoring weights
 can be re-tested offline with `--rescore`, with no API calls. `--refresh <beacon ...>` re-runs

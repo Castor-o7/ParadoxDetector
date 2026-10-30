@@ -745,6 +745,74 @@ def check_rdns(ip: str, sig: Signal) -> None:
                                          "does not resolve back to this IP")
 
 
+# Operators that publish the address ranges their scanners and crawlers use.
+# Membership is a label the operator vouches for; like every label it can
+# explain matching evidence but never discount a contradiction. Palo Alto
+# Xpanse and Shodan publish no public list (Shodan is covered by reverse DNS).
+PUBLISHED_RANGES = [
+    ("Googlebot", "crawler", "json", "https://developers.google.com/static/search/apis/ipranges/googlebot.json"),
+    ("Bingbot", "crawler", "json", "https://www.bing.com/toolbox/bingbot.json"),
+    ("Applebot", "crawler", "json", "https://search.developer.apple.com/applebot.json"),
+    ("GPTBot", "crawler", "json", "https://openai.com/gptbot.json"),
+    # Censys lists its ranges on a documentation page, not in a feed.
+    ("Censys", "scanner", "html", "https://docs.censys.com/docs/opt-out-of-data-collection"),
+]
+CIDR_IN_TEXT = re.compile(r"(?<![\w.:/])(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){2,7})/\d{1,3}(?![\w/])")
+MIN_HTML_RANGES = 5   # a page that yields fewer has probably changed shape; don't trust a partial parse
+
+
+def parse_ranges(fmt: str, raw: bytes) -> list[str]:
+    if fmt == "json":
+        prefixes = json.loads(raw).get("prefixes") or []
+        found = [p.get("ipv4Prefix") or p.get("ipv6Prefix") for p in prefixes]
+    else:
+        found = CIDR_IN_TEXT.findall(raw.decode("utf-8", errors="replace"))
+    nets = []
+    for c in found:
+        try:
+            net = ipaddress.ip_network(c, strict=False)
+        except (TypeError, ValueError):
+            continue
+        if net.is_global and net.prefixlen >= (16 if net.version == 4 else 32):  # nobody owns a /8
+            nets.append(str(net))
+    nets = sorted(set(nets))
+    if fmt == "html" and len(nets) < MIN_HTML_RANGES:
+        raise BeaconError(f"found only {len(nets)} ranges; the page format may have changed")
+    return nets
+
+
+def _published(operator: str, fmt: str, url: str) -> list[str]:
+    def load():
+        status, raw = fetch(url, timeout=20)
+        if status >= 400:
+            raise BeaconError(f"{operator} list returned HTTP {status}")
+        return parse_ranges(fmt, raw)
+    return cached(f"published_{operator.lower()}", 86400, load)
+
+
+def check_published(ip: str, sig: Signal) -> None:
+    addr = ipaddress.ip_address(ip)
+    failed = []
+    for operator, kind, fmt, url in PUBLISHED_RANGES:
+        try:
+            ranges = _published(operator, fmt, url)
+        except Exception:
+            failed.append(operator)
+            continue
+        hit = next((r for r in ranges if addr in ipaddress.ip_network(r)), None)
+        if hit:
+            sig.summary = f"In {operator}'s published {kind} range {hit}"
+            sig.facts = {"operator": operator, "range": hit, "label_kind": kind,
+                         "benign_label": f"Published by {operator}: {kind} range {hit}"}
+            sig.link = url
+            return
+    if len(failed) == len(PUBLISHED_RANGES):
+        raise BeaconError("no operator range list could be loaded")
+    sig.summary = "Not in any operator-published scanner or crawler range"
+    if failed:
+        sig.summary += f" (unavailable: {', '.join(failed)})"
+
+
 BEACONS: list[Beacon] = [
     Beacon("otx", "AlienVault OTX pulses", "fast", 1.0, check_otx, "OTX_API_KEY", False, "minutes-hours"),
     Beacon("greynoise", "GreyNoise sensors", "fast", 0.8, check_greynoise, "GREYNOISE_API_KEY", False, "hours"),
@@ -759,6 +827,8 @@ BEACONS: list[Beacon] = [
     Beacon("rdap", "RDAP registration", "context", 0.0, check_rdap, None, False, "registry"),
     Beacon("tor", "Tor exit list", "context", 0.0, check_tor, None, False, "hourly"),
     Beacon("rdns", "Reverse DNS identity", "context", 0.0, check_rdns, None, False, "live DNS", "dns"),
+    Beacon("published", "Operator-published ranges", "context", 0.0, check_published, None, False,
+           "operator lists, daily"),
 ]
 
 
