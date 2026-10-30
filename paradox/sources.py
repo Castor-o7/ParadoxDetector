@@ -880,5 +880,6 @@ def run_beacon(beacon: Beacon, ip: str) -> Signal:
         sig.status, sig.threat, sig.confidence = "error", None, 0.0
         sig.failure = getattr(exc, "failure", "error")
         sig.summary = str(exc) if isinstance(exc, BeaconError) else f"{type(exc).__name__}: {exc}"
+    sig.last_seen = iso_date(parse_dt(sig.last_seen))  # feeds supply this text; pass on only a real date
     sig.latency_ms = int((time.monotonic() - start) * 1000)
     return sig
