@@ -167,7 +167,7 @@ them. Labels never come from the score's own inputs:
 - **Benign:** public DNS resolvers and the front-end IPs of major sites.
 
 The 2026-10-30 rescore added OTX pulse roles: benign flagged fell from 12% to 4%, AUC rose from 0.995 to
-0.997, detection stayed at 97%, and no malicious score moved. The cost isn't measured by this set: real C2
+0.997, detection stayed at 97%, and no malicious IP's threat moved by more than 0.000 or its paradox by more than 1.0 points. The cost isn't measured by this set: real C2
 servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
 
 **Research scanners.** Scanning blocklists also list research scanners, which are reported for
