@@ -228,5 +228,62 @@ class PublishedRangeTests(unittest.TestCase):
             self.assertIn("unavailable: Bingbot", miss.summary)  # partial outage is reported, not fatal
 
 
+
+class BeaconHealthTests(unittest.TestCase):
+    def run_with(self, status):
+        from unittest import mock
+        from paradox import sources
+        b = next(x for x in sources.BEACONS if x.id == "greynoise")
+        with mock.patch.object(sources, "fetch_json", return_value=(status, {})):
+            return sources.run_beacon(b, "203.0.113.9")
+
+    def test_failures_are_classified(self):
+        self.assertEqual(self.run_with(429).failure, "rate_limited")
+        self.assertEqual(self.run_with(403).failure, "bad_key")
+        self.assertEqual(self.run_with(500).failure, "error")
+        self.assertEqual(self.run_with(500).status, "error")
+
+    def test_missing_required_key_is_no_key(self):
+        from unittest import mock
+        from paradox import config, sources
+        b = next(x for x in sources.BEACONS if x.id == "virustotal")
+        with mock.patch.object(config, "key", return_value=None):
+            s = sources.run_beacon(b, "203.0.113.9")
+        self.assertEqual((s.status, s.failure), ("skipped", "no_key"))
+
+    def test_every_beacon_names_its_cost(self):
+        from paradox import sources
+        self.assertEqual(set(sources.BEACON_COST), {b.id for b in sources.BEACONS})
+
+    def test_status_reports_the_last_answer(self):
+        from unittest import mock
+        from paradox import config, engine, sources
+
+        def fake_run(beacon, ip):
+            s = sources.Signal(source=beacon.id, name=beacon.name, tier=beacon.tier)
+            if beacon.id == "greynoise":
+                s.status, s.failure, s.summary = "error", "rate_limited", "GreyNoise is rate limiting"
+            return s
+
+        with mock.patch.dict(engine._health, clear=True), mock.patch.object(engine, "run_beacon", fake_run), \
+             mock.patch.object(config, "key", return_value="set"):
+            self.assertEqual({b["state"] for b in engine.beacon_status()}, {"untested"})
+            report = engine.scan("45.155.205.233", use_cache=False, record=False)
+            status = {b["id"]: b for b in engine.beacon_status()}
+        self.assertEqual(status["greynoise"]["state"], "rate_limited")
+        self.assertIn("rate limiting", status["greynoise"]["detail"])
+        self.assertEqual(status["spamhaus"]["state"], "ok")
+        self.assertEqual([m["failure"] for m in report["score"]["missing"]], ["rate_limited"])
+        self.assertIn("reverse DNS", report["score"]["missing"][0]["cost"])
+
+    def test_missing_lists_failures_before_unconfigured(self):
+        from paradox import scoring, sources
+        rows = scoring.missing_beacons([
+            sources.Signal("virustotal", "VT", "slow", status="skipped", failure="no_key"),
+            sources.Signal("otx", "OTX", "fast"),
+            sources.Signal("greynoise", "GN", "fast", status="error", failure="rate_limited")])
+        self.assertEqual([m["beacon"] for m in rows], ["GN", "VT"])
+
+
 if __name__ == "__main__":
     unittest.main()

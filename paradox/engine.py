@@ -29,6 +29,7 @@ def normalize_ip(raw: str) -> str:
 
 _cache: dict[str, tuple[float, dict]] = {}
 _lock = threading.Lock()
+_health: dict[str, dict] = {}     # each beacon's last answer, for as long as this process runs
 
 
 def scan(raw_ip: str, use_cache: bool = True, record: bool = True) -> dict:
@@ -43,6 +44,10 @@ def scan(raw_ip: str, use_cache: bool = True, record: bool = True) -> dict:
     with ThreadPoolExecutor(max_workers=len(BEACONS)) as pool:
         signals = list(pool.map(lambda b: run_beacon(b, ip), BEACONS))
 
+    checked_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _lock:
+        _health.update({s.source: {"state": s.failure or "ok", "detail": s.summary if s.failure else "",
+                                   "checked_at": checked_at} for s in signals})
     report = {
         "ip": ip,
         "scanned_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -67,8 +72,18 @@ def cached_report(ip: str) -> dict | None:
 
 
 def beacon_status() -> list[dict]:
-    return [{
-        "id": b.id, "name": b.name, "tier": b.tier, "cadence": b.cadence,
-        "key_env": b.key_env, "key_required": b.key_required,
-        "key_set": bool(b.key_env and config.key(b.key_env)),
-    } for b in BEACONS]
+    """Configuration, plus how each beacon last answered: ok, no_key, rate_limited,
+    bad_key, error, or untested if this process hasn't scanned with it yet."""
+    out = []
+    for b in BEACONS:
+        key_set = bool(b.key_env and config.key(b.key_env))
+        with _lock:
+            health = _health.get(b.id, {})
+        state = "no_key" if b.key_required and not key_set else health.get("state", "untested")
+        out.append({
+            "id": b.id, "name": b.name, "tier": b.tier, "cadence": b.cadence,
+            "key_env": b.key_env, "key_required": b.key_required, "key_set": key_set,
+            "state": state, "detail": health.get("detail", "") if state != "no_key" else f"Set {b.key_env} to enable",
+            "checked_at": health.get("checked_at"),
+        })
+    return out

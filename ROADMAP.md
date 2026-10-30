@@ -261,7 +261,12 @@ The rule for this phase: **the UI should never look more confident than the engi
 missing beacon, an unverified claim or a shared address should be visible, not left for the
 analyst to guess.
 
-### 5.1 Beacon health · S
+### 5.1 Beacon health · S · ✅ shipped
+
+*Shipped:* a status line above the scan form lists each beacon as answering, rate limited, key
+rejected, failing, missing a key, or not tried yet. Each result lists the beacons that gave no
+reading and what that costs, in the web UI, CLI and MCP. Live state lasts as long as the server
+process, so `paradox beacons` in a fresh process shows only key status.
 
 *The gap: a scan run while GreyNoise is rate-limited looks the same as one run with full data.*
 
@@ -319,7 +324,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 
 | When | Items | Why first |
 |---|---|---|
-| Now | ~~1.1, 1.2, 1.5, 3.2~~ (done), 5.1 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
+| Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
 | Next | 1.3, 1.4, 3.1, 3.5, 4.1, 5.2, 5.4 | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |

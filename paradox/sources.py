@@ -39,6 +39,7 @@ class Signal:
     name: str
     tier: str
     status: str = "ok"            # ok | skipped | error
+    failure: str | None = None    # why it didn't answer: no_key | rate_limited | bad_key | error
     threat: float | None = None   # 0 = benign, 1 = confirmed malicious
     confidence: float = 0.0       # how much this reading should count
     last_seen: str | None = None  # ISO date of the freshest evidence
@@ -96,15 +97,23 @@ def _ip_version(ip: str) -> int:
 
 
 class BeaconError(Exception):
-    pass
+    failure = "error"
+
+
+class RateLimited(BeaconError):
+    failure = "rate_limited"
+
+
+class BadKey(BeaconError):
+    failure = "bad_key"
 
 
 def _expect_ok(status: int, data, what: str) -> None:
     if status == 429:
-        raise BeaconError(f"{what} is rate limiting or overloaded (HTTP 429); try again later "
+        raise RateLimited(f"{what} is rate limiting or overloaded (HTTP 429); try again later "
                           "or add an API key")
     if status in (401, 403):
-        raise BeaconError(f"{what} rejected the API key (HTTP {status})")
+        raise BadKey(f"{what} rejected the API key (HTTP {status})")
     if status >= 400 or data is None:
         raise BeaconError(f"{what} returned HTTP {status}")
 
@@ -832,6 +841,25 @@ BEACONS: list[Beacon] = [
 ]
 
 
+# What a report loses when a beacon doesn't answer.
+BEACON_COST = {
+    "otx": "No fresh pulse evidence, so the fast tier is thinner.",
+    "greynoise": "No sensor reading and no GreyNoise label. Scanner identity falls back to reverse DNS and published ranges.",
+    "feodo": "No live botnet C2 check. ThreatFox still covers abuse.ch data if it answered.",
+    "abuseipdb": "No abuse reports, no scan share for the scanner rule, and no usage type for the CDN rule.",
+    "threatfox": "No ThreatFox IOC check. Feodo Tracker still covers abuse.ch C2s.",
+    "spamhaus": "No check against hijacked and criminal netblocks.",
+    "virustotal": "No vendor consensus, so the slow tier is thinner.",
+    "internetdb": "No open-port or CVE evidence, so the slow tier is thinner.",
+    "neighborhood": "No /24 neighbor risk, so a clean IP in a dirty block won't show.",
+    "network": "No ASN, hosting or ASN-DROP facts.",
+    "rdap": "No registration owner. Not scored.",
+    "tor": "No Tor exit check. Not scored.",
+    "rdns": "Reverse DNS claims can't be tested, so a forged identity won't be caught.",
+    "published": "No operator range check, so a listed scanner or crawler loses that label.",
+}
+
+
 def origin_of(source_id: str) -> str:
     return next((b.origin or b.id for b in BEACONS if b.id == source_id), source_id)
 
@@ -839,7 +867,7 @@ def origin_of(source_id: str) -> str:
 def run_beacon(beacon: Beacon, ip: str) -> Signal:
     sig = Signal(source=beacon.id, name=beacon.name, tier=beacon.tier)
     if beacon.key_required and not config.key(beacon.key_env or ""):
-        sig.status = "skipped"
+        sig.status, sig.failure = "skipped", "no_key"
         sig.summary = f"Set {beacon.key_env} to enable"
         return sig
     start = time.monotonic()
@@ -847,6 +875,7 @@ def run_beacon(beacon: Beacon, ip: str) -> Signal:
         beacon.check(ip, sig)
     except Exception as exc:  # one failing beacon must never sink the scan
         sig.status, sig.threat, sig.confidence = "error", None, 0.0
+        sig.failure = getattr(exc, "failure", "error")
         sig.summary = str(exc) if isinstance(exc, BeaconError) else f"{type(exc).__name__}: {exc}"
     sig.latency_ms = int((time.monotonic() - start) * 1000)
     return sig
