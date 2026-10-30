@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Paradox Detector</title>
+  <desc id="d">A paradox gauge beside fast and slow threat beacon meters that disagree, with the tagline: catch the reputation that doesn't match the evidence.</desc>
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.2" fill="#232a36"/></pattern>
+  </defs>
+  <rect width="1200" height="340" rx="16" fill="#0d1016"/>
+  <rect width="1200" height="340" rx="16" fill="url(#grid)"/>
+  <text x="64" y="118" fill="#e8ebf0" font-size="58" font-weight="700" letter-spacing="-1">Paradox Detector</text>
+  <text x="66" y="166" fill="#b4bcc9" font-size="26">Catch the reputation that doesn't match the evidence.</text>
+  <g font-size="17" font-weight="600">
+    <text x="66" y="226" fill="#e8590c">Fast beacons</text>
+    <rect x="186" y="213" width="440" height="14" rx="7" fill="#232a36"/>
+    <rect x="186" y="213" width="396" height="14" rx="7" fill="#e8590c"/>
+    <text x="66" y="266" fill="#339af0">Slow beacons</text>
+    <rect x="186" y="253" width="440" height="14" rx="7" fill="#232a36"/>
+    <rect x="186" y="253" width="44" height="14" rx="7" fill="#339af0"/>
+  </g>
+  <g transform="translate(760 52)">
+    <path d="M20 190 A170 170 0 0 1 360 190" fill="none" stroke="#232a36" stroke-width="30" stroke-linecap="round"/>
+    <path d="M20 190 A170 170 0 0 1 360 190" fill="none" stroke="#ff6b6b" stroke-width="30" stroke-linecap="round" stroke-dasharray="465 534"/>
+    <text x="190" y="166" fill="#e8ebf0" font-size="84" font-weight="700" text-anchor="middle">87</text>
+    <text x="190" y="206" fill="#ff6b6b" font-size="24" font-weight="600" text-anchor="middle">Severe paradox</text>
+  </g>
+</svg>
