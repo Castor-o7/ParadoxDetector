@@ -80,6 +80,29 @@ class IndependenceTests(unittest.TestCase):
             self.assertEqual(bool(ECHO_ENGINES.search(engine)), engine != "abusix", engine)
 
 
+    def test_virustotal_ignores_calibration_label_sources(self):
+        from unittest import mock
+        from paradox import sources
+        results = {"CINS Army": {"category": "malicious"}, "EmergingThreats": {"category": "malicious"},
+                   "IPsum": {"category": "malicious"}, "VendorA": {"category": "malicious"},
+                   "VendorB": {"category": "harmless"}}
+        s = Signal(source="virustotal", name="vt", tier="slow")
+        with mock.patch.object(sources, "fetch_json", return_value=(200, {"data": {"attributes": {"last_analysis_results": results}}})):
+            sources.check_virustotal("203.0.113.9", s)
+        self.assertEqual(s.summary, "1 malicious / 0 suspicious of 2 independent vendors")
+        self.assertIn("CINS Army, EmergingThreats, IPsum", s.evidence[0])
+
+    def test_virustotal_without_per_vendor_results_gives_no_reading(self):
+        from unittest import mock
+        from paradox import sources
+        beacon = next(b for b in sources.BEACONS if b.id == "virustotal")
+        for attrs in ({"last_analysis_stats": {"malicious": 5, "harmless": 80}}, {},
+                      {"last_analysis_results": {"IPsum": {"category": "malicious"}}}):
+            with mock.patch.object(sources, "fetch_json", return_value=(200, {"data": {"attributes": attrs}})), \
+                 mock.patch.object(sources.config, "key", return_value="set"):
+                s = sources.run_beacon(beacon, "203.0.113.9")
+            self.assertEqual((s.status, s.threat), ("error", None), attrs)
+
     def test_virustotal_scores_only_independent_vendors(self):
         from unittest import mock
         from paradox import sources
