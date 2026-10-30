@@ -329,6 +329,69 @@ class LedgerTests(unittest.TestCase):
         self.assertIn("feodo + threatfox", self.labels(r, "threat"))
 
 
+class ThinReportTests(unittest.TestCase):
+    BASE = [sig("otx", "fast", 0.0, 0.5), sig("spamhaus", "slow", 0.0, 0.5), sig("internetdb", "slow", 0.05, 0.6)]
+
+    def abuse(self, threat, reporters, **kw):
+        s = sig("abuseipdb", "fast", threat, min(1.0, 0.4 + reporters / 20), **kw)
+        s.facts["reporters"] = reporters
+        return s
+
+    def test_a_few_reporters_count_for_less(self):
+        thin = compute([self.abuse(0.36, 7)] + self.BASE, now=NOW)
+        self.assertEqual(thin["threat_label"], "Likely benign")
+        self.assertLess(thin["paradox"], 15)
+        self.assertEqual(thin["ledger"]["adjustments"][0]["why"], "only 7 distinct reporters, none in the last 3 days")
+
+    def reading(self, **kw):
+        r = compute([self.abuse(0.36, 7, **kw)] + self.BASE, now=NOW)
+        return next((a["to"] for a in r["ledger"]["adjustments"] if a["field"] == "threat"), 0.36)
+
+    def test_recent_reports_keep_the_full_reading_up_to_the_boundary(self):
+        self.assertEqual(self.reading(last_seen="2026-10-26"), 0.36)
+        self.assertEqual(self.reading(last_seen="2026-10-24"), 0.36)        # NOW minus exactly 3 days
+        self.assertEqual(self.reading(last_seen="2026-10-23T23:59:59+00:00"), 0.21)  # just past it
+        self.assertEqual(self.reading(last_seen="2026-10-01"), 0.21)
+
+    def test_unknown_report_date_counts_as_old(self):
+        self.assertEqual(self.reading(), 0.21)
+        self.assertEqual(self.reading(last_seen="not a date"), 0.21)
+
+    def test_enough_reporters_keep_the_full_reading(self):
+        r = compute([self.abuse(0.97, 12)] + self.BASE, now=NOW)
+        self.assertEqual(r["ledger"]["adjustments"], [])
+        self.assertEqual(r["threat_label"], "Malicious")
+
+    def test_other_beacons_are_not_scaled(self):
+        otx = sig("otx", "fast", 0.9, 0.9)
+        otx.facts["reporters"] = 1
+        self.assertEqual(compute([otx, sig("spamhaus", "slow", 0.0, 0.5)], now=NOW)["ledger"]["adjustments"], [])
+
+    def test_a_benign_label_plays_no_part(self):
+        gn = sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X")
+        labeled = compute([self.abuse(0.9, 3), gn] + self.BASE[1:], now=NOW)
+        plain = compute([self.abuse(0.9, 3), sig("greynoise", "fast", 0.0, 0.6)] + self.BASE[1:], now=NOW)
+        self.assertEqual([a["to"] for a in labeled["ledger"]["adjustments"] if a["field"] == "threat"],
+                         [a["to"] for a in plain["ledger"]["adjustments"] if a["field"] == "threat"])
+
+    def test_a_missing_reporter_count_means_no_scaling(self):
+        from unittest import mock
+        from paradox import sources
+        s = Signal(source="abuseipdb", name="a", tier="fast")
+        body = {"data": {"abuseConfidenceScore": 90, "totalReports": 5}}
+        with mock.patch.object(sources, "fetch_json", return_value=(200, body)):
+            sources.check_abuseipdb("45.1.1.1", s)
+        self.assertNotIn("reporters", s.facts)
+        self.assertEqual(compute([s, sig("spamhaus", "slow", 0.0, 0.5)], now=NOW)["ledger"]["adjustments"], [])
+
+    def test_saved_scans_recover_the_reporter_count(self):
+        from paradox import calibrate
+        saved = {"otx_raw": None, "signals": [{"source": "abuseipdb", "name": "a", "tier": "fast", "threat": 0.36,
+                                                "confidence": 0.75, "summary": "Abuse confidence 36% from 8 reports by 7 users (90d)"}]}
+        abuse = next(s for s in calibrate.build_signals("45.1.1.1", saved) if s.source == "abuseipdb")
+        self.assertEqual(abuse.facts["reporters"], 7)
+
+
 class ClaimTests(unittest.TestCase):
     def rdns(self, status="ok", **facts):
         s = sig("rdns", "context", None, 0.0, status=status)

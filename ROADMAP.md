@@ -36,7 +36,7 @@ What the 2026-10-29 calibration (run 5) and the live tests showed, which sets th
 |---|---|---|
 | The scanner rule depends on GreyNoise, whose free tier runs out daily | 20 of 55 calibration scans got HTTP 429; Shodan's scanner reads as Malicious without its label | 1.1 ✅, 1.2 ✅ |
 | The CDN discount's downside is untested | No malicious IP in the set sits on a CDN | 3.1 |
-| OTX still raises some infrastructure | Quad9's secondary resolver (paradox 23), Netflix (26) | 1.4 ✅ for Quad9 and GitHub; 1.6 for Netflix, which comes from AbuseIPDB |
+| OTX still raises some infrastructure | Quad9's secondary resolver (paradox 23), Netflix (26) | 1.4 ✅ for Quad9 and GitHub; 1.6 ✅ for Netflix, which comes from AbuseIPDB |
 | Blocklists used as labels include research scanners | Shodan and Palo Alto Xpanse IPs were in the "malicious" set | 3.2 ✅ |
 | We assume which beacons are fast and slow, and never measured it | Tiers are hard-coded in `BEACONS` | 3.4 |
 | Veneer has no ground truth, so we can't state its precision | No labeled veneer cases exist | 3.3 |
@@ -129,11 +129,38 @@ cover +0.06"), in the CLI, the web UI and the MCP output. When the detector says
 paper tiger, an analyst should see exactly which claim failed. This also makes rule changes
 reviewable.
 
-### 1.6 Netflix and thin AbuseIPDB reports · M
+### 1.6 Netflix and thin AbuseIPDB reports · M · ✅ shipped
 
-- [ ] **PDX-27: Netflix's AbuseIPDB false alarm.** Done when: a calibration rescore shows 207.45.73.1 below paradox 15 and below threat 0.15, for a stated reason that also applies to other IPs, with no malicious IP newly falling below Suspicious.
+- [x] **PDX-27: Netflix's AbuseIPDB false alarm.** Done when: AbuseIPDB readings from fewer than 12 distinct reporters are scaled unless the latest report is within 3 days, tests pin that boundary, a rescore shows 207.45.73.1 below paradox 15 and threat 0.15 while its latest report is outside the window, and no malicious IP newly falls below Suspicious.
 
-207.45.73.1 reads paradox 25.5 and threat 0.18 because AbuseIPDB gives it 36% confidence from 8 reports
+*This line was reworded after the results, with the operator's agreement.* It originally read: "a calibration
+rescore shows 207.45.73.1 below paradox 15 and below threat 0.15, for a stated reason that also applies to other
+IPs, with no malicious IP newly falling below Suspicious." The operator added the recency exemption to keep early
+warnings, and with it the original can fail on any day Netflix gets a report. The new bar is conditional on the
+same timing that makes this fix intermittent: Netflix only has to clear while it has no recent report, and it
+doesn't stay cleared.
+
+*Shipped:* AbuseIPDB's reading scales down below 12 distinct reporters, unless the latest report
+is within 3 days. An unknown date counts as old. The exemption was the operator's call, to keep early
+warnings. On 2026-10-30, 207.45.73.1 read paradox 13.7 and threat 0.109, and benign flagged fell from 4% to
+0%. AdGuard stays at Mild tension (paradox 15.1) because its latest report was a day old, so benign IPs with
+mild tension or more fell from 8% to 4%. No malicious IP's threat changed, and paradox moved by at most 0.1.
+
+*How the numbers were chosen:* 12 is the smallest cutoff that clears Netflix on the 55 calibration IPs. Any
+window from 2 to 6 days gives the same results today, and 3 is the value the operator and watchman discussed in
+that range. A 1-day window would also clear AdGuard but gives early warnings almost no time, and 7 would lose
+Netflix. It rests on two suspect and two benign IPs from one day.
+
+*Known costs:* Netflix clears only while nobody has reported it recently: one report inside the window puts
+it back at paradox 25.5. A few accounts can still smear an IP: in a simulation of three reporters at 50% on a
+clean IP, paradox was 32.4 with a report that day and 6.1 with an old one. Early-warning readings also expire:
+121.45.161.148 keeps paradox 23.2 today, and the same evidence six days later reads 7.7. Rescores of saved scans
+therefore depend on the day they run.
+
+*Limits:* the rule cleared no false alarm in the fresh sample of 85 IPs. Its one flagged benign IP
+(35.186.224.24) has 22 reporters, so it's untouched at paradox 60.9.
+
+207.45.73.1 read paradox 25.5 and threat 0.18 because AbuseIPDB gives it 36% confidence from 8 reports
 by 7 users. Its only OTX pulse is honeypot data, so PDX-4 can't reach it. A rule written just for this
 address wouldn't count. Find out what separates a few reports on a major provider from real abuse.
 
@@ -248,6 +275,13 @@ We assume OTX is fast and VirusTotal is slow. History can measure each beacon's 
 first flag relative to the other beacons, across every IP that eventually got flagged. Assign
 tiers from measured median lag, and report when a "slow" source turns out to be fast or the
 reverse. The paradox definition then rests on data.
+
+### 3.6 Rescores that reproduce · S
+
+- [ ] **PDX-28: Score saved scans as of when they were taken.** Done when: `paradox calibrate --rescore` ages each saved scan against its recorded scan time, scans without one say so in the report, and a test shows the same saved scan gets the same score on different days.
+
+Saved scans are aged against today's date, so recency rules such as 1.6's window and the veneer's freshness check
+give different results depending on the day of the rescore, and a past result can't be reproduced.
 
 ### 3.5 Adversarial test suite · M
 
@@ -413,7 +447,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.6, 3.1, 3.5, 4.1, ~~1.4, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.5, 3.6, 4.1, ~~1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 

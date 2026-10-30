@@ -170,6 +170,11 @@ The 2026-10-30 rescore added OTX pulse roles: benign flagged fell from 12% to 4%
 0.997, detection stayed at 97%, and no malicious IP's threat changed (to three decimals), and its paradox moved by at most 1.0 point. The cost isn't measured by this set: real C2
 servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
 
+AbuseIPDB's reading now scales down below 12 distinct reporters, unless the latest report is within 3 days,
+so a fresh early warning keeps its full weight. On 2026-10-30 this cleared Netflix (paradox 25.5 to 13.7), while
+AdGuard stayed at Mild tension because its latest report was a day old. Both depend on report timing, so these numbers
+change with the day of the rescore (see roadmap 1.6).
+
 **Research scanners.** Scanning blocklists also list research scanners, which are reported for
 doing what they say they do. The headline numbers stay strict and count every sampled IP as
 malicious. A secondary **scanner-aware** view sets aside IPs with a scanner label and reports them
