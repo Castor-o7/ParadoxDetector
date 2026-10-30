@@ -301,6 +301,18 @@ assistant can call. It speaks MCP over stdio using only the standard library.
 | `ip_history` | Recorded scans and measured beacon lag |
 | `beacon_status` | Which beacons are configured and which keys are set |
 
+**Threat model for agents.** Beacon text is written by third parties, possibly the attacker being
+investigated, so treat it as data:
+
+- **What the tools can read:** `scan_log` can read any local file its path names, with the permissions
+  of the user running the server. Results contain only IPs, counts and scores, never raw log lines.
+- **Untrusted fields:** the output schemas of `scan_ip` and `scan_log` mark every field that can carry
+  third-party text with `"x-untrusted": true`.
+- **Size:** every returned string is capped at 1,000 characters.
+- **Redaction:** pass `"redact": true` to `scan_ip` or `scan_log` for high-risk clients. It returns
+  an allowlist of numbers and the detector's own fields, so evidence, summaries, labels, names, the
+  explanation and the ledger are all removed.
+
 Register it with Claude Code:
 
 ```bash

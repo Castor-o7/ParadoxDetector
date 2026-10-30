@@ -264,9 +264,9 @@ Have Claude return a structured verdict (severity, recommended action) that is c
 the numeric score, with prose only as explanation. A disagreement gets flagged instead of shown.
 The model can't then quietly overrule the evidence, whether through injection or error.
 
-### 4.3 MCP hardening · S
+### 4.3 MCP hardening · S · ✅ shipped
 
-- [ ] **PDX-18: MCP hardening.** Done when: the output schema marks third-party fields as untrusted, evidence strings are capped, `redact` strips evidence text, and tests cover the cap and `redact`.
+- [x] **PDX-18: MCP hardening.** Done when: the output schema marks third-party fields as untrusted, evidence strings are capped, `redact` strips evidence text, and tests cover the cap and `redact`.
 
 - Mark third-party fields as untrusted in the `structuredContent` schema, not just in a note.
 - Cap the size of returned evidence strings.
@@ -390,7 +390,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
 | Next | 1.3, 1.4, 3.1, 3.5, 4.1, ~~5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
-| Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
+| Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
 Items 3.3, 3.4 and 1.3 need weeks of history, so the most useful thing to start right away
