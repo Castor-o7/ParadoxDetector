@@ -56,5 +56,30 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(tracked[1]["scans"], 2)
 
 
+class TrackedTests(HistoryTests):
+    def scan(self, when, paradox, ip="45.1.1.1"):
+        r = report(ip, when, 0.5, 0.0)
+        r["score"]["paradox"] = paradox
+        history.record(r)
+
+    def test_open_since_is_the_start_of_the_current_run(self):
+        self.scan("2026-10-20T00:00:00+00:00", 50)
+        self.scan("2026-10-21T00:00:00+00:00", 10)      # closed
+        self.scan("2026-10-22T00:00:00+00:00", 40)      # reopened
+        self.scan("2026-10-23T00:00:00+00:00", 60)
+        t = history.tracked()[0]
+        self.assertEqual(t["open_since"], "2026-10-22T00:00:00+00:00")
+        self.assertEqual((t["scans"], t["paradox"], t["threat"], t["veneer"]), (4, 60, 0.5, False))
+        self.assertEqual(t["first_scan"], "2026-10-20T00:00:00+00:00")
+
+    def test_closed_paradox_has_no_open_since_and_newest_comes_first(self):
+        self.scan("2026-10-20T00:00:00+00:00", 50)
+        self.scan("2026-10-21T00:00:00+00:00", 10)
+        self.scan("2026-10-25T00:00:00+00:00", 50, ip="45.2.2.2")
+        rows = history.tracked()
+        self.assertEqual([t["ip"] for t in rows], ["45.2.2.2", "45.1.1.1"])
+        self.assertIsNone(rows[1]["open_since"])
+
+
 if __name__ == "__main__":
     unittest.main()

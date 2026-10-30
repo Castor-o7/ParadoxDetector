@@ -104,6 +104,7 @@ def compact(report: dict) -> dict:
         "explanation": sc["explanation"],
         "ledger": sc["ledger"],
         "missing": sc["missing"],
+        "claims": sc["claims"],
         "veneer": sc["veneer"],
         "network": sc["network"],
         "note": UNTRUSTED,

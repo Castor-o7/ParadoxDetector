@@ -18,6 +18,7 @@ from .sources import age_days, parse_dt
 DB_PATH = config.DATA_DIR / "history.sqlite3"
 FLAG_THREAT = 0.4
 FLAG_CONFIDENCE = 0.5
+OPEN_PARADOX = 35     # the score where the label becomes "Paradox"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -60,14 +61,19 @@ def scans(ip: str, limit: int = 500) -> list[dict]:
 
 
 def tracked() -> list[dict]:
-    """Every IP with history, newest scan first, with its latest scores."""
+    """Every IP with history, newest scan first, with its latest scores and when
+    its current run of scans at or above OPEN_PARADOX began (None if not open)."""
     with closing(_connect()) as conn:
-        rows = conn.execute(
-            "SELECT ip, COUNT(*) AS scans, MIN(scanned_at) AS first_scan, MAX(scanned_at) AS last_scan,"
-            " (SELECT paradox FROM scans s2 WHERE s2.ip = s.ip ORDER BY scanned_at DESC LIMIT 1) AS paradox,"
-            " (SELECT direction FROM scans s2 WHERE s2.ip = s.ip ORDER BY scanned_at DESC LIMIT 1) AS direction"
-            " FROM scans s GROUP BY ip ORDER BY last_scan DESC").fetchall()
-    return [dict(r) for r in rows]
+        rows = conn.execute("SELECT ip, scanned_at, paradox, threat, direction, veneer FROM scans"
+                            " ORDER BY ip, scanned_at").fetchall()
+    by_ip: dict[str, dict] = {}
+    for r in rows:
+        t = by_ip.setdefault(r["ip"], {"ip": r["ip"], "scans": 0, "first_scan": r["scanned_at"], "open_since": None})
+        is_open = (r["paradox"] or 0) >= OPEN_PARADOX
+        t.update(scans=t["scans"] + 1, last_scan=r["scanned_at"], paradox=r["paradox"], threat=r["threat"],
+                 direction=r["direction"], veneer=bool(r["veneer"]),
+                 open_since=(t["open_since"] or r["scanned_at"]) if is_open else None)
+    return sorted(by_ip.values(), key=lambda t: t["last_scan"], reverse=True)
 
 
 def lag(ip: str, now: datetime | None = None) -> dict:

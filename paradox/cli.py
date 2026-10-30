@@ -52,6 +52,11 @@ def render(report: dict) -> str:
                          + ("  [ASN-DROP]" if nw.get("asn_drop") else "  [hosting]" if nw.get("hosting") else ""))
     if sc.get("ledger"):
         lines[-1:-1] = render_ledger(sc["ledger"])
+    if sc.get("claims"):
+        lines.insert(-1, "  Claims:")
+        lines[-1:-1] = [f"    [{c['result'].replace('_', ' ')}] {c['claim']} (tested by: {c['test']})"
+                        + ("; fresh evidence contradicts it" if c["contradicted"] and c["result"] == "confirmed" else "")
+                        for c in sc["claims"]]
     if sc.get("missing"):
         lines.insert(-1, "  No answer from:")
         lines[-1:-1] = [f"    {m['beacon']} [{(m['failure'] or m['status']).replace('_', ' ')}]: {m['cost']}"

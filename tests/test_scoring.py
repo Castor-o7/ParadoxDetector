@@ -329,6 +329,55 @@ class LedgerTests(unittest.TestCase):
         self.assertIn("feodo + threatfox", self.labels(r, "threat"))
 
 
+class ClaimTests(unittest.TestCase):
+    def rdns(self, status="ok", **facts):
+        s = sig("rdns", "context", None, 0.0, status=status)
+        s.facts.update(facts)
+        return s
+
+    BASE = [sig("otx", "fast", 0.0, 0.5), sig("spamhaus", "slow", 0.0, 0.5)]
+
+    def claims(self, *extra):
+        return compute(list(extra) + self.BASE, now=NOW)["claims"]
+
+    def test_forged_reverse_dns_is_unconfirmed(self):
+        c = self.claims(self.rdns(claim="Shodan", spoofed_identity="does not resolve back"))
+        self.assertEqual([(x["claim"], x["result"]) for x in c], [("Reverse DNS says Shodan", "unconfirmed")])
+
+    def test_confirmed_identity_can_still_be_contradicted(self):
+        good = self.rdns(claim="Shodan", benign_label="rDNS: Shodan scanner, forward-confirmed", label_kind="scanner")
+        c = self.claims(good, sig("abuseipdb", "fast", 0.9, 0.9, last_seen="2026-10-26"))[0]
+        self.assertEqual(c["result"], "confirmed")
+        self.assertTrue(c["contradicted"])
+
+    def test_published_range_is_confirmed(self):
+        s = sig("published", "context", None, 0.0, benign_label="Published by Censys: scanner range 1.2.3.0/24")
+        s.facts.update(operator="Censys", label_kind="scanner")
+        c = self.claims(s)
+        self.assertEqual((c[0]["claim"], c[0]["result"]), ("Censys lists this address", "confirmed"))
+
+    def test_vouch_is_never_called_confirmed(self):
+        c = self.claims(sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X"))
+        self.assertEqual(c[0]["result"], "not_contradicted")
+        c = self.claims(sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X"),
+                        sig("abuseipdb", "fast", 0.9, 0.9, last_seen="2026-10-26"))
+        self.assertEqual(c[0]["result"], "unconfirmed")
+
+    def test_forgery_alone_does_not_condemn_other_labels(self):
+        r = compute([self.rdns(claim="Shodan", spoofed_identity="forged"),
+                     sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X")] + self.BASE, now=NOW)
+        self.assertEqual({c["claim"]: c["result"] for c in r["claims"]},
+                         {"Reverse DNS says Shodan": "unconfirmed", "GreyNoise RIOT: X": "not_contradicted"})
+        self.assertIn("Veneer: forged identity contradicted", [x["label"] for x in r["ledger"]["paradox"]])
+
+    def test_failed_checks_are_untested_and_ordered_first_after_failures(self):
+        c = self.claims(self.rdns(status="error"), sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X"))
+        self.assertEqual([x["result"] for x in c], ["untested", "not_contradicted"])
+
+    def test_no_claims_no_rows(self):
+        self.assertEqual(self.claims(self.rdns(ptr="host.example.com", confirmed=True)), [])
+
+
 class OtxQualityTests(unittest.TestCase):
     def otx(self, *pulses):
         return {"pulse_info": {"count": len(pulses), "pulses": list(pulses)}}
