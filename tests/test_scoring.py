@@ -360,6 +360,16 @@ class ThinReportTests(unittest.TestCase):
         self.assertEqual([a["to"] for a in labeled["ledger"]["adjustments"] if a["field"] == "threat"],
                          [a["to"] for a in plain["ledger"]["adjustments"] if a["field"] == "threat"])
 
+    def test_a_missing_reporter_count_means_no_scaling(self):
+        from unittest import mock
+        from paradox import sources
+        s = Signal(source="abuseipdb", name="a", tier="fast")
+        body = {"data": {"abuseConfidenceScore": 90, "totalReports": 5}}
+        with mock.patch.object(sources, "fetch_json", return_value=(200, body)):
+            sources.check_abuseipdb("45.1.1.1", s)
+        self.assertNotIn("reporters", s.facts)
+        self.assertEqual(compute([s, sig("spamhaus", "slow", 0.0, 0.5)], now=NOW)["ledger"]["adjustments"], [])
+
     def test_saved_scans_recover_the_reporter_count(self):
         from paradox import calibrate
         saved = {"otx_raw": None, "signals": [{"source": "abuseipdb", "name": "a", "tier": "fast", "threat": 0.36,
