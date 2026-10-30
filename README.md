@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.svg" alt="Paradox Detector: catch the reputation that doesn't match the evidence" width="100%"></p>
+
 # Cyber Security Paradox Detector
 
 [![CI](https://github.com/Castor-o7/ParadoxDetector/actions/workflows/ci.yml/badge.svg)](https://github.com/Castor-o7/ParadoxDetector/actions/workflows/ci.yml)
@@ -5,10 +7,18 @@
 Give it a public IP. It queries several threat-intel beacons at the same time and scores how much the
 **fast-updating** beacons disagree with the **slow-updating** ones.
 
-A high **paradox score** usually means live sources (OTX pulses, sensor networks, botnet trackers)
-see a threat that curated blocklists and vendor reputation haven't picked up yet. That's an emerging
-threat that slips past slower defenses.
+- **Emerging threats:** live sources (OTX pulses, sensor networks, botnet trackers) see something that
+  curated blocklists and vendor reputation haven't picked up yet.
+- **Borrowed reputations:** a trusted label, such as a known scanner or a whitelist entry, is contradicted
+  by fresh evidence.
+- **Stale reputations:** slow lists still flag an address, but nothing fresh backs them up.
 
+Every score comes with its reasoning: signed points that add up to the result, each identity claim and how
+it was tested, and which beacons didn't answer.
+
+<p align="center"><img src="docs/screenshot.png" alt="A scan report showing a severe paradox: fast beacons at 81, slow beacons at 3, with a contradicted reputation label" width="800"></p>
+
+Use it as a web app, a CLI, a batch log scanner, a headless log watcher or an MCP server for AI assistants.
 Where it's headed: [ROADMAP.md](ROADMAP.md), on unmasking borrowed legitimacy.
 
 ## Install
