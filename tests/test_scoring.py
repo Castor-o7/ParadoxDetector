@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from paradox.scoring import compute
-from paradox.sources import Signal, abuse_scan_share, otx_scan_share, score_otx
+from paradox.sources import Signal, abuse_scan_share, otx_scan_share, pulse_role, score_otx
 
 NOW = datetime(2026, 10, 27, tzinfo=timezone.utc)
 
@@ -400,6 +400,41 @@ class OtxQualityTests(unittest.TestCase):
                     pulse(1, cloned_from="abc"), pulse(1, pulse_source="api"),
                     pulse(1, subscriber_count=0)):
             self.assertLess(score_otx(self.otx(bad), now=NOW)["threat"], good, bad)
+
+
+class PulseRoleTests(unittest.TestCase):
+    def role(self, name="Campaign", tags=(), **counts):
+        return pulse_role({"name": name, "tags": list(tags), "indicator_type_counts": counts})
+
+    def test_address_lists_are_actors(self):
+        self.assertEqual(self.role(IPv4=95, domain=5), "actor")
+
+    def test_malware_reports_describe_what_was_contacted(self):
+        self.assertEqual(self.role(IPv4=10, domain=90), "contacted")
+        self.assertEqual(self.role(**{"FileHash-MD5": 40}, IPv4=60), "contacted")
+
+    def test_honeypot_data_is_actor_whatever_else_it_lists(self):
+        self.assertEqual(self.role("Honeypot Data - T-Pot", **{"FileHash-MD5": 80}, IPv4=20), "actor")
+        self.assertEqual(self.role(tags=["bruteforce"], domain=100), "actor")
+
+    def test_no_indicator_counts_is_unknown(self):
+        self.assertEqual(self.role(), "unknown")
+        self.assertEqual(self.role(IPv4=40, CVE=60), "unknown")
+
+    def test_contacted_pulses_count_for_less_and_say_why(self):
+        actor = pulse(1, indicator_type_counts={"IPv4": 100})
+        contacted = pulse(1, indicator_type_counts={"IPv4": 10, "domain": 90})
+        data = {"pulse_info": {"count": 1, "pulses": [contacted]}}
+        self.assertLess(score_otx(data, now=NOW)["threat"],
+                        score_otx({"pulse_info": {"count": 1, "pulses": [actor]}}, now=NOW)["threat"])
+        self.assertIn("contacted, not actor", score_otx(data, now=NOW)["top"][0][2])
+
+    def test_an_authors_actor_pulse_still_counts_fully(self):
+        actor = pulse(1, indicator_type_counts={"IPv4": 100})
+        contacted = pulse(1, indicator_type_counts={"domain": 100})
+        both = {"pulse_info": {"count": 2, "pulses": [contacted, actor]}}
+        alone = {"pulse_info": {"count": 1, "pulses": [actor]}}
+        self.assertEqual(score_otx(both, now=NOW)["threat"], score_otx(alone, now=NOW)["threat"])
 
 
 class OtxRecencyTests(unittest.TestCase):

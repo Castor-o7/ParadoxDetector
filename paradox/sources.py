@@ -131,7 +131,33 @@ OTX_AUTOMATED_FACTOR = 0.6
 OTX_SPECIFIC_INDICATORS = 1000   # pulses up to this size count fully
 OTX_SPECIFICITY_POWER = 0.75     # 3,000 indicators -> 0.44, 20,000 -> 0.11
 OTX_WHITELIST_FACTOR = 0.2
+OTX_CONTACTED_FACTOR = 0.5       # a pulse describing what malware talked to, not who attacked
+OTX_ACTOR_IP_SHARE = 0.9         # a pulse this full of addresses is a list of actors
+OTX_HASH_SHARE = 0.3             # sandbox reports are built around file hashes...
+OTX_NETWORK_SHARE = 0.5          # ...and the domains and URLs the sample reached
+HONEYPOT_PULSE = re.compile(r"honeypot|honeynet|t-pot|brute.?force|attackers?\b", re.IGNORECASE)
 JUNK_PULSE_NAME = re.compile(r"^\s*(test\w*|\d+|.{0,3}|.*clone.*)\s*$", re.IGNORECASE)
+
+
+def pulse_role(p: dict) -> str:
+    """What a pulse says about the addresses in it, judged from what else it
+    lists: "actor" (honeypot hits, attacker feeds), "contacted" (a malware report
+    listing what the sample talked to) or "unknown"."""
+    counts = p.get("indicator_type_counts") or {}
+    total = sum(counts.values())
+    text = " ".join([p.get("name") or ""] + [str(t) for t in p.get("tags") or []])
+    if HONEYPOT_PULSE.search(text):
+        return "actor"
+    if not total:
+        return "unknown"
+    ips = sum(counts.get(k, 0) for k in ("IPv4", "IPv6", "CIDR"))
+    hashes = sum(v for k, v in counts.items() if k.startswith("FileHash"))
+    network = sum(counts.get(k, 0) for k in ("domain", "hostname", "URL"))
+    if ips / total >= OTX_ACTOR_IP_SHARE:
+        return "actor"
+    if hashes / total >= OTX_HASH_SHARE or network / total >= OTX_NETWORK_SHARE:
+        return "contacted"
+    return "unknown"
 
 
 def pulse_quality(p: dict) -> tuple[float, list[str]]:
@@ -148,6 +174,9 @@ def pulse_quality(p: dict) -> tuple[float, list[str]]:
         # DNS resolvers and CDNs it used, so huge pulses say little per IP.
         q *= (OTX_SPECIFIC_INDICATORS / size) ** OTX_SPECIFICITY_POWER
         why.append(f"bulk: {size:,} indicators")
+    if pulse_role(p) == "contacted":
+        q *= OTX_CONTACTED_FACTOR
+        why.append("contacted, not actor")
     if p.get("cloned_from"):
         q *= 0.3
         why.append("clone")
