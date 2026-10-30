@@ -260,6 +260,9 @@ is reported separately. An IP that every beacon agrees is malicious has high thr
 Every report carries a **ledger**: signed points that add up to the paradox and threat scores, plus what the
 rules changed about a beacon before it voted. The CLI, web UI and MCP tools all show it.
 
+Each report also lists every **identity claim** (reverse DNS, operator lists, third-party labels), how it
+was tested, and the result. The web UI's **Watch** mode lists tracked IPs, longest-open paradox first.
+
 Each report also lists the beacons that gave **no reading** (rate limited, key rejected, failed or not
 configured) and what that costs the result. The web UI's status line shows how each beacon last answered.
 

@@ -116,6 +116,13 @@ table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .health summary b { color: var(--warn); font-weight: 600; }
 .health table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .health td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.claims { margin-top: 16px; }
+.claims .row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; align-items: start; }
+.claims .row:last-child { border-bottom: 0; padding-bottom: 0; }
+.claims .how { color: var(--muted); font-size: 13px; }
+.claims .tag { justify-self: start; white-space: nowrap; }
+.watchnote { margin: 8px 0 0; color: var(--warn); font-size: 14px; }
+table.logres td.open { color: var(--bad); font-weight: 600; white-space: nowrap; }
 .ledger { margin-top: 16px; }
 .ledger .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 28px; margin-top: 8px; }
 .ledger h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -144,6 +151,7 @@ table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
   <div class="modes" role="group" aria-label="Mode">
     <button type="button" id="m-ip" aria-pressed="true">Single IP</button>
     <button type="button" id="m-log" aria-pressed="false">Scan a log</button>
+    <button type="button" id="m-watch" aria-pressed="false">Watch</button>
   </div>
 
   <form id="f">
@@ -260,6 +268,20 @@ async function loadHealth() {
   }
 }
 
+const CLAIMS = {confirmed: ["Confirmed", "var(--ok)"], unconfirmed: ["Unconfirmed", "var(--bad)"],
+                not_contradicted: ["Not contradicted", "var(--muted)"], untested: ["Untested", "var(--warn)"]};
+
+function claimsPanel(claims) {
+  if (!claims?.length) return "";
+  return `<div class="panel claims"><strong>Claims and how they were tested</strong>
+    ${claims.map(c => {
+      const [text, color] = CLAIMS[c.result];
+      const twist = c.result === "confirmed" && c.contradicted ? `<div class="how err">Identity checks out, but fresh evidence contradicts its good name.</div>` : "";
+      return `<div class="row"><span class="tag" style="color:${color}">${text}</span>
+        <div>${esc(c.claim)}<div class="how">Tested by: ${esc(c.test)}. ${esc(c.detail)}</div>${twist}</div></div>`;
+    }).join("")}</div>`;
+}
+
 function ledgerColumn(title, rows, total) {
   const signed = p => `${p > 0 ? "+" : "\u2212"}${Math.abs(p).toFixed(1)}`;
   return `<div><h3>${title}</h3>
@@ -305,6 +327,7 @@ function render(r) {
         </div>
       </div>
     </div>
+    ${claimsPanel(sc.claims)}
     ${ledgerPanel(sc)}
     <div class="panel hist" id="hist"><span class="spinner"></span> Loading history…</div>
     ${section(r, "fast", "Fast-updating beacons", "var(--fast)")}
@@ -463,12 +486,60 @@ async function scan(ip) {
   } finally { go.disabled = false; }
 }
 
-function setMode(log) {
-  $("#m-ip").setAttribute("aria-pressed", !log); $("#m-log").setAttribute("aria-pressed", log);
-  $("#f").hidden = log; $(".examples").hidden = log; $("#lf").hidden = !log;
+function setMode(mode) {
+  const leaving = $("#m-watch").getAttribute("aria-pressed") === "true";
+  for (const m of ["ip", "log", "watch"]) $(`#m-${m}`).setAttribute("aria-pressed", m === mode);
+  $("#f").hidden = mode !== "ip"; $(".examples").hidden = mode !== "ip"; $("#lf").hidden = mode !== "log";
+  if (mode === "watch") loadWatch();
+  else if (leaving) $("#out").innerHTML = `<div class="panel empty">Enter an IP address to query the beacons.</div>`;
 }
-$("#m-ip").onclick = () => setMode(false);
-$("#m-log").onclick = () => setMode(true);
+$("#m-ip").onclick = () => setMode("ip");
+$("#m-log").onclick = () => setMode("log");
+$("#m-watch").onclick = () => setMode("watch");
+
+const DAY = 86400000;
+function ago(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (ms < 3600000) return `${Math.max(1, Math.round(ms / 60000))}m`;
+  return ms < DAY ? `${Math.round(ms / 3600000)}h` : `${Math.round(ms / DAY)}d`;
+}
+
+async function loadWatch() {
+  const out = $("#out");
+  out.innerHTML = `<div class="panel empty"><span class="spinner"></span> Loading tracked IPs…</div>`;
+  try {
+    const res = await fetch("/api/tracked");
+    const rows = await res.json();
+    if (!res.ok) throw new Error(rows.error);
+    if ($("#m-watch").getAttribute("aria-pressed") !== "true") return;
+    if (!rows.length) {
+      out.innerHTML = `<div class="panel empty">No recorded scans yet. Scan an IP, or run <code>paradox watch --rescan-every 6</code> to follow your logs.</div>`;
+      return;
+    }
+    const since = t => t.open_since ? Date.parse(t.open_since) : Infinity;
+    const sorted = [...rows].sort((a, b) => since(a) === since(b) ? 0 : since(a) - since(b));
+    const open = rows.filter(t => t.open_since).length;
+    const newest = Math.max(...rows.map(t => Date.parse(t.last_scan)));
+    const stale = Date.now() - newest > DAY
+      ? `<p class="watchnote">Nothing has been scanned for ${ago(new Date(newest).toISOString())}, so these readings may be out of date. Is <code>paradox watch --rescan-every 6</code> running?</p>` : "";
+    out.innerHTML = `<div class="panel">
+      <div class="stats"><span><b>${rows.length}</b> tracked IPs</span><span><b>${open}</b> with an open paradox</span></div>
+      <p class="explain">Latest recorded reading for each IP, longest-open paradox first. An IP's paradox is open while its scans stay at 35 or above. Click an IP to rescan it.</p>
+      ${stale}
+      <div class="tablewrap"><table class="logres">
+        <thead><tr><th>IP</th><th>Open for</th><th style="text-align:right">Paradox</th><th style="text-align:right">Threat</th>
+          <th>Direction</th><th>Last scan</th><th style="text-align:right">Scans</th></tr></thead>
+        <tbody>${sorted.map(t => `<tr><td class="ip"><a data-ip="${esc(t.ip)}">${esc(t.ip)}</a></td>
+          <td class="${t.open_since ? "open" : ""}">${t.open_since ? ago(t.open_since) : "–"}</td>
+          <td class="n">${t.paradox.toFixed(0)}</td><td class="n">${pct(t.threat)}</td>
+          <td>${esc(t.direction)}${t.veneer ? " · veneer" : ""}</td>
+          <td>${ago(t.last_scan)} ago</td><td class="n">${t.scans}</td></tr>`).join("")}</tbody>
+      </table></div></div>`;
+    out.querySelectorAll("td.ip a").forEach(a => a.onclick = () => { setMode("ip"); $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
+  } catch (e) {
+    out.innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
+  }
+}
 $("#logfile").onchange = async e => {
   const f = e.target.files[0];
   if (!f) return;
@@ -525,7 +596,7 @@ async function scanLog(text, limit) {
     }
     if (job.state === "error") throw new Error(job.error);
     out.innerHTML = logResults(job.result); loadHealth();
-    out.querySelectorAll("td.ip a").forEach(a => a.onclick = () => { setMode(false); $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
+    out.querySelectorAll("td.ip a").forEach(a => a.onclick = () => { setMode("ip"); $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
   } catch (e) {
     out.innerHTML = `<div class="panel empty err">${esc(e.message)}</div>`;
   } finally { go.disabled = false; }
@@ -540,8 +611,9 @@ $("#lf").onsubmit = e => {
 $("#f").onsubmit = e => { e.preventDefault(); scan($("#ip").value.trim()); };
 document.querySelectorAll(".examples a").forEach(a => a.onclick = () => { $("#ip").value = a.dataset.ip; scan(a.dataset.ip); });
 loadHealth();
-const initial = new URLSearchParams(location.search).get("ip");
+const params = new URLSearchParams(location.search), initial = params.get("ip");
 if (initial) { $("#ip").value = initial; scan(initial); }
+else if (params.get("view") === "watch") setMode("watch");
 </script>
 </body>
 </html>

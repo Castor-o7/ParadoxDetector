@@ -178,7 +178,8 @@ def detect_veneer(signals: list[Signal], now: datetime) -> dict:
     """Find benign labels that another beacon contradicts with fresh evidence."""
     labels = [s for s in signals if s.status == "ok" and s.facts.get("benign_label")]
     out = {"active": False, "strength": 0.0,
-           "labels": [s.facts["benign_label"] for s in labels], "contradicted_by": []}
+           "labels": [s.facts["benign_label"] for s in labels], "contradicted_by": [],
+           "contradicted_labels": []}
     if not labels:
         return out
     hits = []
@@ -194,7 +195,9 @@ def detect_veneer(signals: list[Signal], now: datetime) -> dict:
         hits.append(s)
     if hits:
         out.update(active=True, strength=round(max(s.threat for s in hits), 3),
-                   contradicted_by=[f"{s.name} ({s.summary})" for s in hits])
+                   contradicted_by=[f"{s.name} ({s.summary})" for s in hits],
+                   contradicted_labels=[lab.facts["benign_label"] for lab in labels
+                                        if any(origin_of(s.source) != origin_of(lab.source) for s in hits)])
     return out
 
 
@@ -235,6 +238,39 @@ def adjustments(before: list[Signal], after: list[Signal], scanner: dict, shared
             out.append({"beacon": old.name, "field": "confidence", "from": round(old.confidence, 3),
                         "to": round(new.confidence, 3), "why": "its benign label is contradicted, so it counts at half weight"})
     return out
+
+
+def identity_claims(signals: list[Signal], veneer: dict) -> list[dict]:
+    """Each claim about who this IP is, how it was tested and what came back:
+    confirmed, unconfirmed (the claim failed), not_contradicted (a vouch nothing
+    could verify, only fail to refute) or untested (the check itself failed)."""
+    out = []
+
+    def add(s: Signal, claim: str, test: str, result: str) -> None:
+        out.append({"claim": claim, "test": test, "result": result, "source": s.name,
+                    "detail": s.facts.get("spoofed_identity") or s.summary,
+                    "contradicted": s.facts.get("benign_label") in veneer["contradicted_labels"]})
+
+    for s in signals:
+        if s.source == "rdns":
+            test = "Name in reverse DNS must resolve back to this IP"
+            if s.status != "ok":
+                add(s, "Reverse DNS identity", test, "untested")
+            elif s.facts.get("spoofed_identity") or s.facts.get("benign_label"):
+                who = s.facts.get("claim", "a known operator")
+                add(s, f"Reverse DNS says {who}", test, "unconfirmed" if s.facts.get("spoofed_identity") else "confirmed")
+        elif s.source == "published":
+            test = "Operator's own published address list"
+            if s.status != "ok":
+                add(s, "Operator-published ranges", test, "untested")
+            elif s.facts.get("benign_label"):
+                add(s, f"{s.facts['operator']} lists this address", test, "confirmed")
+        elif s.status == "ok" and s.facts.get("benign_label"):
+            label = s.facts["benign_label"]
+            add(s, label, "Other beacons' fresh evidence",
+                "unconfirmed" if label in veneer["contradicted_labels"] else "not_contradicted")
+    order = ("unconfirmed", "untested", "not_contradicted", "confirmed")
+    return sorted(out, key=lambda c: order.index(c["result"]))
 
 
 def missing_beacons(signals: list[Signal]) -> list[dict]:
@@ -300,8 +336,8 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
         "paradox": _rows(
             ("Fast beacons ahead of slow" if gap >= 0 else "Slow beacons ahead of fast (counts at half)", 100 * terms[0]),
             ("Beacons disagree with each other", 100 * terms[1]),
-            ("Veneer: " + "; ".join((veneer["labels"] if len(veneer["contradicted_by"]) > len(spoofed) else [])
-                                     + (["forged identity"] if spoofed else [])) + " contradicted", 100 * terms[2]),
+            ("Veneer: " + "; ".join(veneer["contradicted_labels"] + (["forged identity"] if spoofed else []))
+             + " contradicted", 100 * terms[2]),
             ("Clean IP in dirty surroundings", 100 * terms[3]),
             ("Capped at 100", 100 * (raw - sum(terms))),
             (f"Coverage {coverage:.0%}: not every tier answered", 100 * raw * 0.6 * (coverage - 1))),
@@ -363,6 +399,7 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
         "threat_label": threat_label(threat),
         "ledger": ledger,
         "missing": missing_beacons(original),
+        "claims": identity_claims(original, veneer),
         "fast": fast,
         "slow": slow,
         "gap": round(gap, 3),

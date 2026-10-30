@@ -26,14 +26,14 @@ Effort: **S** is about a day, **M** a few days, **L** a week or more.
 
 ## Where we stand
 
-What the 2026-10-29 calibration (run 5) and the live tests showed, which sets the priorities below:
+What the 2026-10-29 calibration (run 5) and the live tests showed, which sets the priorities below. A ✅ marks a shipped fix; the rescore after 1.1, 1.2 and 3.2 is in the README:
 
 | Finding | Evidence | Addressed by |
 |---|---|---|
-| The scanner rule depends on GreyNoise, whose free tier runs out daily | 20 of 55 calibration scans got HTTP 429; Shodan's scanner reads as Malicious without its label | 1.1, 1.2 |
+| The scanner rule depends on GreyNoise, whose free tier runs out daily | 20 of 55 calibration scans got HTTP 429; Shodan's scanner reads as Malicious without its label | 1.1 ✅, 1.2 ✅ |
 | The CDN discount's downside is untested | No malicious IP in the set sits on a CDN | 3.1 |
 | OTX still raises some infrastructure | Quad9's secondary resolver (paradox 23), Netflix (26) | 1.4 |
-| Blocklists used as labels include research scanners | Shodan and Palo Alto Xpanse IPs were in the "malicious" set | 3.2 |
+| Blocklists used as labels include research scanners | Shodan and Palo Alto Xpanse IPs were in the "malicious" set | 3.2 ✅ |
 | We assume which beacons are fast and slow, and never measured it | Tiers are hard-coded in `BEACONS` | 3.4 |
 | Veneer has no ground truth, so we can't state its precision | No labeled veneer cases exist | 3.3 |
 
@@ -275,7 +275,11 @@ configured, which are keyless, which are missing a key, and which are rate-limit
 right now. On each result, mark the beacons that didn't answer and say what that costs ("scanner
 label unavailable: GreyNoise quota spent").
 
-### 5.2 Watch view · S
+### 5.2 Watch view · S · ✅ shipped
+
+*Shipped:* a Watch mode listing every IP with recorded scans, longest-open paradox first. A paradox
+counts as open while consecutive scans stay at 35 or above. The view warns when nothing has been
+scanned for over a day.
 
 The server also serves `/api/tracked`, which the UI doesn't call either. Add a view of what
 `paradox watch` is following: each IP's last scan, its current paradox and direction, and how long
@@ -288,7 +292,11 @@ can sort and filter by paradox score, veneer, direction and last-seen date, wher
 opens the chart that already exists. Later, 1.3's label-age timeline and 3.3's outcomes chart go
 here.
 
-### 5.4 Claims and how they were tested · S
+### 5.4 Claims and how they were tested · S · ✅ shipped
+
+*Shipped with a fourth result,* **not contradicted**: a third-party vouch nothing could verify
+stands only because no fresh evidence refuted it, and calling that confirmed would look more
+confident than the engine is. A confirmed identity whose behavior is contradicted says so.
 
 *Pairs with 1.5.*
 
@@ -325,7 +333,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.4, 3.1, 3.5, 4.1, 5.2, 5.4 | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 1.4, 3.1, 3.5, 4.1, ~~5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
