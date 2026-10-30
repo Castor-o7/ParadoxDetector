@@ -166,6 +166,10 @@ them. Labels never come from the score's own inputs:
   out.
 - **Benign:** public DNS resolvers and the front-end IPs of major sites.
 
+The 2026-10-30 rescore added OTX pulse roles: benign flagged fell from 12% to 4%, AUC rose from 0.995 to
+0.997, detection stayed at 97%, and no malicious score moved. The cost isn't measured by this set: real C2
+servers also appear in contacted pulses, and OTX's reading fell by about 20% on Feodo's five listed C2s.
+
 **Research scanners.** Scanning blocklists also list research scanners, which are reported for
 doing what they say they do. The headline numbers stay strict and count every sampled IP as
 malicious. A secondary **scanner-aware** view sets aside IPs with a scanner label and reports them
@@ -251,6 +255,8 @@ Anyone can publish an OTX pulse, so pulses are scored for independence and quali
   account can't inflate an IP's score or smear it.
 - **Quality discounts.** Automated feeds ×0.6, clones ×0.3, test/junk names ×0.3, and pulses with
   few subscribers count for less.
+- **Actor or contacted.** A pulse built around file hashes, domains or URLs mostly lists what malware
+  talked to, so it counts at half weight. Address lists and honeypot data count fully.
 - **Recency.** Pulses lose half their weight every 30 days.
 - **Confidence** grows with the number of distinct authors, not the number of pulses.
 

@@ -36,7 +36,7 @@ What the 2026-10-29 calibration (run 5) and the live tests showed, which sets th
 |---|---|---|
 | The scanner rule depends on GreyNoise, whose free tier runs out daily | 20 of 55 calibration scans got HTTP 429; Shodan's scanner reads as Malicious without its label | 1.1 ✅, 1.2 ✅ |
 | The CDN discount's downside is untested | No malicious IP in the set sits on a CDN | 3.1 |
-| OTX still raises some infrastructure | Quad9's secondary resolver (paradox 23), Netflix (26) | 1.4 |
+| OTX still raises some infrastructure | Quad9's secondary resolver (paradox 23), Netflix (26) | 1.4 ✅ for Quad9; Netflix comes from AbuseIPDB and is still open |
 | Blocklists used as labels include research scanners | Shodan and Palo Alto Xpanse IPs were in the "malicious" set | 3.2 ✅ |
 | We assume which beacons are fast and slow, and never measured it | Tiers are hard-coded in `BEACONS` | 3.4 |
 | Veneer has no ground truth, so we can't state its precision | No labeled veneer cases exist | 3.3 |
@@ -88,9 +88,21 @@ normal.
 
 - **Source:** `history.sqlite3`; needs `paradox watch --rescan-every` running to build timelines.
 
-### 1.4 Tell "actor" pulses from "contacted" pulses in OTX · M
+### 1.4 Tell "actor" pulses from "contacted" pulses in OTX · M · ✅ shipped
 
-- [ ] **PDX-4: Actor vs. contacted OTX pulses.** Done when: contacted pulses count at a fraction of the weight, and a calibration rescore shows Quad9, Netflix and GitHub lower with no malicious IP below Suspicious.
+- [x] **PDX-4: Actor vs. contacted OTX pulses.** Done when: contacted pulses count at a fraction of the weight, and a calibration rescore shows Quad9, Netflix and GitHub lower with no malicious IP below Suspicious.
+
+*Shipped:* each pulse's role comes from its indicator mix, since OTX's IP lookup doesn't list a
+pulse's other indicators. Contacted pulses count at half weight. Rescore: benign flagged fell from
+12% to 4%, Quad9's secondary resolver went from paradox 23 to 11 and GitHub from 15 to 7, and no
+malicious score moved.
+
+*Not fixed:* Netflix stays at paradox 26, because its score comes from AbuseIPDB, not OTX. Shodan's
+scanner (80.82.77.139) was already below Suspicious, as a known scanner, and still is.
+
+*Downside:* a C2 server is also something malware contacts. On Feodo's five listed C2s, OTX's own
+reading fell by about 20%, and Feodo still lists them. A C2 that only OTX knows about would score
+lower, which this calibration set can't measure until 3.1 adds cloud C2s.
 
 The remaining OTX false positives come from research reports that list every address the malware
 *talked to*. Classify each pulse's role for the IP from what else it lists: a pulse full of
@@ -389,7 +401,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.4, 3.1, 3.5, 4.1, ~~5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.5, 4.1, ~~1.4, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
