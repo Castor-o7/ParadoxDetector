@@ -135,13 +135,14 @@ reviewable.
 
 *Built, in review:* AbuseIPDB's reading scales down below 12 distinct reporters, unless the latest report
 is within 3 days. An unknown date counts as old. The exemption was the operator's call, to keep early
-warnings. On 2026-10-30, 207.45.73.1 read paradox 13.7 and threat 0.109, benign flagged fell from 4% to 0%
-without counting AdGuard, which stays flagged because its latest report was a day old, so the overall figure
-is 4%. No malicious IP's threat changed, and paradox moved by at most 0.1.
+warnings. On 2026-10-30, 207.45.73.1 read paradox 13.7 and threat 0.109, and benign flagged fell from 4% to
+0%. AdGuard stays at Mild tension (paradox 15.1) because its latest report was a day old, so benign IPs with
+mild tension or more fell from 8% to 4%. No malicious IP's threat changed, and paradox moved by at most 0.1.
 
 *How the numbers were chosen:* 12 is the smallest cutoff that clears Netflix on the 55 calibration IPs. Any
-window from 1 to 4 days gives the same results on this data, because the affected IPs' latest reports were 0-1
-or 5+ days old, and 3 is simply a value in that gap. It rests on two suspect and two benign IPs from one day.
+window from 2 to 6 days gives the same results today, and 3 is the value the operator and watchman discussed in
+that range. A 1-day window would also clear AdGuard but gives early warnings almost no time, and 7 would lose
+Netflix. It rests on two suspect and two benign IPs from one day.
 
 *Known costs:* Netflix clears only while nobody has reported it recently: one report inside the window puts
 it back at paradox 25.5. A few accounts can still smear an IP: in a simulation of three reporters at 50% on a

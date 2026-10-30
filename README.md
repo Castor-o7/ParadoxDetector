@@ -172,7 +172,7 @@ servers also appear in contacted pulses, and OTX's reading fell by about 20% on 
 
 AbuseIPDB's reading now scales down below 12 distinct reporters, unless the latest report is within 3 days,
 so a fresh early warning keeps its full weight. On 2026-10-30 this cleared Netflix (paradox 25.5 to 13.7), while
-AdGuard stayed flagged because its latest report was a day old. Both depend on report timing, so these numbers
+AdGuard stayed at Mild tension because its latest report was a day old. Both depend on report timing, so these numbers
 change with the day of the rescore (see roadmap 1.6).
 
 **Research scanners.** Scanning blocklists also list research scanners, which are reported for
