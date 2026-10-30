@@ -172,6 +172,20 @@ At 4 lookups a minute, a log scan runs out early and later IPs lose VirusTotal, 
 comparable. Waiting makes big scans slow, and not waiting leaves gaps; choosing between them is part of this story.
 The free tier also rules out business workflows, commercial products and services.
 
+### 1.8 One VirusTotal vendor can't flag an IP on its own · S · ✅ shipped
+
+- [x] **PDX-32: Don't let one vendor decide.** Done when: a VirusTotal reading backed by exactly one vendor can't by itself rate an IP Suspicious or act as a veneer contradiction, a test pins that with two vendors unchanged, and a rescore of the 55 calibration IPs and the 85-IP sample reports detection, benign flagged, and every IP that newly falls below Suspicious.
+
+With VirusTotal on, one vendor of 86 flagged Netflix and 208.67.220.220 as Suspicious, because its reading had a fixed
+0.8 confidence, which is the bar for a confident detection.
+
+*Shipped:* a reading backed by one vendor keeps its threat at 0.4 confidence, so it stays as evidence but can't reach
+a floor or contradict a label. Two vendors, or none, keep 0.8. With VirusTotal on, benign flagged fell from 12% to 4%
+on the 55 IPs and from 4 to 1 of 25 on the fresh sample, and no malicious IP fell below Suspicious on either.
+
+*Downside:* a real attacker known to exactly one vendor and nothing else now reads Likely benign. Neither set has
+such a case, so this cost is unmeasured.
+
 ---
 
 ## Phase 2: Unmask new kinds of borrowed legitimacy
@@ -478,7 +492,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, 4.5, ~~3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, 4.5, ~~1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 

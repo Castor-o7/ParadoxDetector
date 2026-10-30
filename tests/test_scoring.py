@@ -92,6 +92,40 @@ class IndependenceTests(unittest.TestCase):
         self.assertEqual(s.summary, "1 malicious / 0 suspicious of 2 independent vendors")
         self.assertIn("CINS Army, EmergingThreats, IPsum", s.evidence[0])
 
+    def vt(self, *flags):
+        from unittest import mock
+        from paradox import sources
+        results = {f"Vendor{i}": {"category": c} for i, c in enumerate(flags)} | {"Clean": {"category": "harmless"}}
+        s = Signal(source="virustotal", name="vt", tier="slow")
+        with mock.patch.object(sources, "fetch_json", return_value=(200, {"data": {"attributes": {"last_analysis_results": results}}})):
+            sources.check_virustotal("203.0.113.9", s)
+        return s
+
+    def test_one_vendor_alone_cannot_rate_an_ip_suspicious(self):
+        quiet = [sig("otx", "fast", 0.0, 0.5), sig("abuseipdb", "fast", 0.0, 0.8), sig("spamhaus", "slow", 0.0, 0.5)]
+        for flag in ("malicious", "suspicious"):
+            r = compute(quiet + [self.vt(flag)], now=NOW)
+            self.assertEqual(r["threat_label"], "Likely benign", flag)
+
+    def test_one_vendor_cannot_contradict_a_label(self):
+        gn = sig("greynoise", "fast", 0.0, 0.6, benign_label="GreyNoise RIOT: X")
+        one = self.vt(*["malicious"] * 1)
+        one.threat = 0.6     # even with a high reading, one vendor isn't a contradiction
+        self.assertFalse(compute([gn, one], now=NOW)["veneer"]["active"])
+
+    def test_two_vendors_and_clean_answers_keep_full_confidence(self):
+        self.assertEqual(self.vt("malicious", "malicious").confidence, 0.8)
+        self.assertEqual(self.vt("malicious", "suspicious").confidence, 0.8)
+        self.assertEqual(self.vt().confidence, 0.8)
+        self.assertEqual(self.vt("malicious").confidence, 0.4)
+
+    def test_saved_scans_are_rescored_under_the_vendor_rule(self):
+        from paradox import calibrate
+        saved = {"otx_raw": None, "signals": [{"source": "virustotal", "name": "v", "tier": "slow", "threat": 0.2,
+                                                "confidence": 0.8, "summary": "1 malicious / 0 suspicious of 86 independent vendors"}]}
+        vt = next(s for s in calibrate.build_signals("45.1.1.1", saved) if s.source == "virustotal")
+        self.assertEqual(vt.confidence, 0.4)
+
     def test_virustotal_without_per_vendor_results_gives_no_reading(self):
         from unittest import mock
         from paradox import sources

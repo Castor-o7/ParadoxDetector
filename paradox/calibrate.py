@@ -39,7 +39,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import config, scoring
 from .sources import (BEACONS, NEIGHBOR_LISTS, Signal, _drop_networks, _feodo_index, _ip_list,
-                      apply_otx, fetch_otx, run_beacon)
+                      apply_otx, fetch_otx, run_beacon, virustotal_confidence)
 
 DIR = config.DATA_DIR / "calibration"
 SCANS = DIR / "scans"
@@ -121,6 +121,8 @@ def build_signals(ip: str, saved: dict) -> list[Signal]:
             s.facts.setdefault("label_kind", "scanner")
         if s.source == "abuseipdb" and (m := re.search(r"by (\d+) users", s.summary)):
             s.facts.setdefault("reporters", int(m[1]))   # scans saved before reporters was a fact
+        if s.source == "virustotal" and s.status == "ok" and (m := re.match(r"(\d+) malicious / (\d+) suspicious", s.summary)):
+            s.confidence = virustotal_confidence(int(m[1]), int(m[2]))   # re-score under the current rule
     return [sig] + others
 
 
