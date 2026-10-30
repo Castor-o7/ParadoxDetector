@@ -95,7 +95,7 @@ normal.
 *Built, "done when" not yet met:* each pulse's role comes from its indicator mix, since OTX's IP lookup doesn't list a
 pulse's other indicators. Contacted pulses count at half weight. Rescore: benign flagged fell from
 12% to 4%, Quad9's secondary resolver went from paradox 23 to 11 and GitHub from 15 to 7, and
-no malicious IP's threat moved by more than 0.000 or its paradox by more than 1.0 points.
+no malicious IP's threat changed (to three decimals), and its paradox moved by at most 1.0 point.
 
 *Not fixed:* Netflix stays at paradox 26, because its score comes from AbuseIPDB, not OTX. Shodan's
 scanner (80.82.77.139) was already below Suspicious, as a known scanner, and still is.
