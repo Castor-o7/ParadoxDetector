@@ -88,7 +88,11 @@ is describing actors. Count "contacted" pulses at a fraction of the weight.
 - **Measure:** Quad9, Netflix and GitHub should drop; no malicious IP should fall below
   Suspicious.
 
-### 1.5 Explain the score as a ledger · S
+### 1.5 Explain the score as a ledger · S · ✅ shipped
+
+*Shipped:* signed paradox and threat points that add up to each score, plus what the rules changed
+about a beacon before it voted, in the CLI, the web UI and MCP. The ledger is display only: across
+20,000 randomized signal sets, every score matched the code from before it. No rescore was needed.
 
 Show each score as signed contributions ("AbuseIPDB +0.31; scanner label explains −0.24; network
 cover +0.06"), in the CLI, the web UI and the MCP output. When the detector says something is a
@@ -315,7 +319,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 
 | When | Items | Why first |
 |---|---|---|
-| Now | ~~1.1, 1.2, 3.2~~ (done), 1.5, 5.1 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
+| Now | ~~1.1, 1.2, 1.5, 3.2~~ (done), 5.1 | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
 | Next | 1.3, 1.4, 3.1, 3.5, 4.1, 5.2, 5.4 | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2–4.4, 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |

@@ -101,6 +101,7 @@ def compact(report: dict) -> dict:
         "threat": sc["threat"], "threat_label": sc["threat_label"],
         "fast_tier": sc["fast"]["score"], "slow_tier": sc["slow"]["score"], "coverage": sc["coverage"],
         "explanation": sc["explanation"],
+        "ledger": sc["ledger"],
         "veneer": sc["veneer"],
         "network": sc["network"],
         "note": UNTRUSTED,

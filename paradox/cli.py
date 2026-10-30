@@ -50,6 +50,8 @@ def render(report: dict) -> str:
         lines.insert(-1, f"  NETWORK  {nw['risk'] * 100:5.1f}/100  {nw.get('listed_neighbors', 0)} listed neighbors in "
                          f"{nw['prefix']}, {nw.get('holder') or 'unknown ASN'}"
                          + ("  [ASN-DROP]" if nw.get("asn_drop") else "  [hosting]" if nw.get("hosting") else ""))
+    if sc.get("ledger"):
+        lines[-1:-1] = render_ledger(sc["ledger"])
     for tier in ("fast", "slow", "network", "context"):
         lines.append(f"  -- {tier.upper()} --")
         for s in (x for x in report["signals"] if x["tier"] == tier):
@@ -62,6 +64,16 @@ def render(report: dict) -> str:
                 lines.append(f"      · {ev}")
         lines.append("")
     return "\n".join(lines)
+
+
+def render_ledger(ledger: dict) -> list[str]:
+    lines = []
+    for name, key in (("Paradox", "paradox"), ("Threat", "threat")):
+        lines.append(f"  {name} points:")
+        lines += [f"    {r['points']:+6.1f}  {r['label']}" for r in ledger[key]] or ["      none"]
+    lines += [f"  adjusted: {a['beacon']} {a['field']} {a['from']:.2f} -> {a['to']:.2f} ({a['why']})"
+              for a in ledger["adjustments"]]
+    return lines
 
 
 def render_history(ip: str) -> str:
