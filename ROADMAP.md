@@ -129,26 +129,28 @@ cover +0.06"), in the CLI, the web UI and the MCP output. When the detector says
 paper tiger, an analyst should see exactly which claim failed. This also makes rule changes
 reviewable.
 
-### 1.6 Netflix and thin AbuseIPDB reports · M · ✅ shipped
+### 1.6 Netflix and thin AbuseIPDB reports · M · in review
 
-- [x] **PDX-27: Netflix's AbuseIPDB false alarm.** Done when: a calibration rescore shows 207.45.73.1 below paradox 15 and below threat 0.15, for a stated reason that also applies to other IPs, with no malicious IP newly falling below Suspicious.
+- [ ] **PDX-27: Netflix's AbuseIPDB false alarm.** Done when: a calibration rescore shows 207.45.73.1 below paradox 15 and below threat 0.15, for a stated reason that also applies to other IPs, with no malicious IP newly falling below Suspicious.
 
-*Shipped:* AbuseIPDB's reading scales down below 12 distinct reporters, because a handful of reports
-can be mistaken or stray. The rule doesn't look at labels or at this address. Rescore: 207.45.73.1 went
-to paradox 13.7 and threat 0.109, benign flagged fell from 4% to 0%, no malicious IP's threat changed,
-and paradox moved by at most 0.1.
+*Built, in review:* AbuseIPDB's reading scales down below 12 distinct reporters, unless the latest report
+is within 3 days. An unknown date counts as old. The exemption was the operator's call, to keep early
+warnings. On 2026-10-30, 207.45.73.1 read paradox 13.7 and threat 0.109, benign flagged fell from 4% to 0%
+without counting AdGuard, which stays flagged because its latest report was a day old, so the overall figure
+is 4%. No malicious IP's threat changed, and paradox moved by at most 0.1.
 
-*Fresh sample:* the cutoff was picked on the 55 calibration IPs, as the smallest that meets the line,
-then checked on 85 new IPs. The 30 established malicious IPs didn't change.
+*How the numbers were chosen:* 12 is the smallest cutoff that clears Netflix on the 55 calibration IPs. Any
+window from 1 to 4 days gives the same results on this data, because the affected IPs' latest reports were 0-1
+or 5+ days old, and 3 is simply a value in that gap. It rests on two suspect and two benign IPs from one day.
 
-*Limits:* the rule cleared no false alarm in the fresh sample. Its one flagged benign IP (35.186.224.24)
-has 22 reporters, so it's untouched at paradox 60.9, and that class of false alarm is still open.
+*Known costs:* Netflix clears only while nobody has reported it recently: one report inside the window puts
+it back at paradox 25.5. A few accounts can still smear an IP: in a simulation of three reporters at 50% on a
+clean IP, paradox was 32.4 with a report that day and 6.1 with an old one. Early-warning readings also expire:
+121.45.161.148 keeps paradox 23.2 today, and the same evidence six days later reads 7.7. Rescores of saved scans
+therefore depend on the day they run.
 
-*Downside:* few reporters is also what a new attacker looks like. Among 30 IPs on a single blocklist, two
-were affected: 121.45.161.148 (4 reporters, reported that day) went from paradox 23.2 to 7.7, and
-129.226.180.47 (4 reporters) from 28.1 to 24.0, staying Suspicious by 0.001. The rule makes smearing with
-a few accounts harder, at the cost of slower early warning from AbuseIPDB. Those two have no ground truth
-beyond one blocklist, and the 85 IPs are one day's sample.
+*Limits:* the rule cleared no false alarm in the fresh sample of 85 IPs. Its one flagged benign IP
+(35.186.224.24) has 22 reporters, so it's untouched at paradox 60.9.
 
 207.45.73.1 read paradox 25.5 and threat 0.18 because AbuseIPDB gives it 36% confidence from 8 reports
 by 7 users. Its only OTX pulse is honeypot data, so PDX-4 can't reach it. A rule written just for this

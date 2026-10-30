@@ -341,7 +341,21 @@ class ThinReportTests(unittest.TestCase):
         thin = compute([self.abuse(0.36, 7)] + self.BASE, now=NOW)
         self.assertEqual(thin["threat_label"], "Likely benign")
         self.assertLess(thin["paradox"], 15)
-        self.assertEqual(thin["ledger"]["adjustments"][0]["why"], "only 7 distinct reporters")
+        self.assertEqual(thin["ledger"]["adjustments"][0]["why"], "only 7 distinct reporters, none in the last 3 days")
+
+    def reading(self, **kw):
+        r = compute([self.abuse(0.36, 7, **kw)] + self.BASE, now=NOW)
+        return next((a["to"] for a in r["ledger"]["adjustments"] if a["field"] == "threat"), 0.36)
+
+    def test_recent_reports_keep_the_full_reading_up_to_the_boundary(self):
+        self.assertEqual(self.reading(last_seen="2026-10-26"), 0.36)
+        self.assertEqual(self.reading(last_seen="2026-10-24"), 0.36)        # NOW minus exactly 3 days
+        self.assertEqual(self.reading(last_seen="2026-10-23T23:59:59+00:00"), 0.21)  # just past it
+        self.assertEqual(self.reading(last_seen="2026-10-01"), 0.21)
+
+    def test_unknown_report_date_counts_as_old(self):
+        self.assertEqual(self.reading(), 0.21)
+        self.assertEqual(self.reading(last_seen="not a date"), 0.21)
 
     def test_enough_reporters_keep_the_full_reading(self):
         r = compute([self.abuse(0.97, 12)] + self.BASE, now=NOW)
