@@ -16,7 +16,7 @@ Give it a public IP. It queries several threat-intel beacons at the same time an
 Every score comes with its reasoning: signed points that add up to the result, each identity claim and how
 it was tested, and which beacons didn't answer.
 
-<p align="center"><img src="docs/screenshot.png" alt="A scan report showing a severe paradox: fast beacons at 81, slow beacons at 3, with a contradicted reputation label" width="800"></p>
+<p align="center"><img src="docs/screenshot.png" alt="A scan report with a paradox score of 49 and a contradicted reputation label, listing which beacons gave no reading" width="800"></p>
 
 Use it as a web app, a CLI, a batch log scanner, a headless log watcher or an MCP server for AI assistants.
 Where it's headed: [ROADMAP.md](ROADMAP.md), on unmasking borrowed legitimacy.

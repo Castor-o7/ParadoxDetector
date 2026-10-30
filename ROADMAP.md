@@ -164,6 +164,14 @@ therefore depend on the day they run.
 by 7 users. Its only OTX pulse is honeypot data, so PDX-4 can't reach it. A rule written just for this
 address wouldn't count. Find out what separates a few reports on a major provider from real abuse.
 
+### 1.7 Pace VirusTotal's free quota · S
+
+- [ ] **PDX-30: Stay inside VirusTotal's free limits.** Done when: a test with a fake clock shows a batch of 25 IPs makes at most 4 VirusTotal lookups a minute, an IP that didn't get a lookup because of pacing says so in its report, a repeat lookup inside the cache window uses no quota, and the README states the limits (4 a minute, 500 a day, 15.5K a month).
+
+At 4 lookups a minute, a log scan runs out early and later IPs lose VirusTotal, so results within one scan aren't
+comparable. Waiting makes big scans slow, and not waiting leaves gaps; choosing between them is part of this story.
+The free tier also rules out business workflows, commercial products and services.
+
 ---
 
 ## Phase 2: Unmask new kinds of borrowed legitimacy
@@ -457,7 +465,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 3.1, 3.5, 3.6, 4.1, 4.5, ~~1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, 4.5, ~~1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
