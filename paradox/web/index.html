@@ -18,6 +18,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 main { max-width: 1080px; margin: 0 auto; padding: 28px 16px 64px; }
@@ -108,6 +109,13 @@ table.logres td.n { font-family: var(--mono); text-align: right; white-space: no
 table.logres td.ip a { font-family: var(--mono); color: var(--accent); cursor: pointer; }
 table.logres .why { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .tablewrap { overflow-x: auto; }
+.ledger { margin-top: 16px; }
+.ledger .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 28px; margin-top: 8px; }
+.ledger h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.ledger .row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 14px; border-bottom: 1px solid var(--line); }
+.ledger .row b { font-family: var(--mono); white-space: nowrap; }
+.ledger .row.total { border-bottom: 0; font-weight: 600; }
+.ledger ul { margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
 .err { color: var(--bad); }
 .empty { color: var(--muted); text-align: center; padding: 48px 16px; }
 .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
@@ -209,6 +217,22 @@ function veneerBox(v, scanner) {
     <ul>${v.contradicted_by.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
 }
 
+function ledgerColumn(title, rows, total) {
+  const signed = p => `${p > 0 ? "+" : "\u2212"}${Math.abs(p).toFixed(1)}`;
+  return `<div><h3>${title}</h3>
+    ${rows.map(x => `<div class="row"><span>${esc(x.label)}</span><b style="color:${x.points < 0 ? "var(--ok)" : "var(--ink)"}">${signed(x.points)}</b></div>`).join("")}
+    <div class="row total"><span>Score</span><b>${total.toFixed(1)}</b></div></div>`;
+}
+
+function ledgerPanel(sc) {
+  const l = sc.ledger;
+  if (!l) return "";
+  return `<div class="panel ledger"><strong>Why this score</strong>
+    <div class="cols">${ledgerColumn("Paradox points", l.paradox, sc.paradox)}${ledgerColumn("Threat points", l.threat, sc.threat * 100)}</div>
+    ${l.adjustments.length ? `<ul>${l.adjustments.map(a => `<li>${esc(a.beacon)} ${esc(a.field)} ${pct(a.from)} → ${pct(a.to)}: ${esc(a.why)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
 function render(r) {
   const sc = r.score;
   const dirText = {emerging: "Emerging threat", stale: "Stale reputation", aligned: "Aligned"}[sc.direction];
@@ -237,6 +261,7 @@ function render(r) {
         </div>
       </div>
     </div>
+    ${ledgerPanel(sc)}
     <div class="panel hist" id="hist"><span class="spinner"></span> Loading history…</div>
     ${section(r, "fast", "Fast-updating beacons", "var(--fast)")}
     ${section(r, "slow", "Slow-updating beacons", "var(--slow)")}

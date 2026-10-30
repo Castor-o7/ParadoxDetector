@@ -257,6 +257,9 @@ Anyone can publish an OTX pulse, so pulses are scored for independence and quali
 Labels: <15 Coherent, <35 Mild tension, <60 Paradox, ≥60 Severe paradox. The overall **threat** score
 is reported separately. An IP that every beacon agrees is malicious has high threat and a low paradox.
 
+Every report carries a **ledger**: signed points that add up to the paradox and threat scores, plus what the
+rules changed about a beacon before it voted. The CLI, web UI and MCP tools all show it.
+
 You can tune tiers and weights in `paradox/sources.py` (`BEACONS`) and the constants in `paradox/scoring.py`.
 
 ## Batch log scanning

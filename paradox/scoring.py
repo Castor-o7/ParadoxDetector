@@ -213,8 +213,33 @@ def network_risk(signals: list[Signal]) -> dict:
             "holder": asn.facts.get("holder") if asn else None}
 
 
+def _rows(*rows: tuple[str, float]) -> list[dict]:
+    return [{"label": text, "points": round(points, 2)} for text, points in rows if abs(points) >= 0.005]
+
+
+def adjustments(before: list[Signal], after: list[Signal], scanner: dict, shared: str | None) -> list[dict]:
+    """What the rules changed about a scored beacon before it voted."""
+    out = []
+    for old, new in zip(before, after):
+        if old.status != "ok" or old.threat is None or old.tier not in ("fast", "slow"):
+            continue
+        if new.threat != old.threat:
+            why = []
+            if new.facts.get("explained_by_label"):
+                why.append(f"{scanner['label']} explains the {old.facts['scan_share']:.0%} that is scanning")
+            if shared and new.source == "otx":
+                why.append("CDN address, where OTX mentions are mostly malware contacting it")
+            out.append({"beacon": old.name, "field": "threat", "from": old.threat, "to": new.threat,
+                        "why": "; ".join(why)})
+        if new.confidence != old.confidence:
+            out.append({"beacon": old.name, "field": "confidence", "from": round(old.confidence, 3),
+                        "to": round(new.confidence, 3), "why": "its benign label is contradicted, so it counts at half weight"})
+    return out
+
+
 def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
+    original = signals
     signals, scanner = explain_scanning(signals)
     signals, shared = shared_infrastructure(signals)
     veneer = detect_veneer(signals, now)
@@ -246,18 +271,42 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
     # Blend in the fast tier's view so a fresh, confident detection is not
     # averaged away by many quiet slow sources.
     threat = max(consensus, 0.6 * f + 0.4 * s) if fast["score"] is not None else consensus
+    blended = threat
     # A single high-confidence detection (live C2, DROP netblock) sets a floor.
     strong = [x.threat for x, _ in rows if x.confidence >= 0.8]
     threat = max(threat, 0.85 * max(strong, default=0.0))
+    floored = threat
 
     network = network_risk(signals)
     network["cover"] = round(max(0.0, network["risk"] - threat), 3)
-    raw = min(1.0, 0.8 * directional + 0.2 * disp + VENEER_WEIGHT * veneer["strength"]
-              + NETWORK_WEIGHT * network["cover"])
+    terms = (0.8 * directional, 0.2 * disp, VENEER_WEIGHT * veneer["strength"], NETWORK_WEIGHT * network["cover"])
+    raw = min(1.0, sum(terms))
     paradox = round(100 * raw * (0.4 + 0.6 * coverage), 1)
     threat = max(threat, NETWORK_THREAT_FACTOR * network["risk"])
+    networked = threat
     if spoofed:
         threat = max(threat, SPOOF_THREAT_FLOOR)
+
+    # The ledger explains the numbers above and feeds nothing back into them:
+    # each list adds up to its score, whichever rule decided it.
+    ledger = {
+        "paradox": _rows(
+            ("Fast beacons ahead of slow" if gap >= 0 else "Slow beacons ahead of fast (counts at half)", 100 * terms[0]),
+            ("Beacons disagree with each other", 100 * terms[1]),
+            ("Veneer: " + "; ".join((veneer["labels"] if len(veneer["contradicted_by"]) > len(spoofed) else [])
+                                     + (["forged identity"] if spoofed else [])) + " contradicted", 100 * terms[2]),
+            ("Clean IP in dirty surroundings", 100 * terms[3]),
+            ("Capped at 100", 100 * (raw - sum(terms))),
+            (f"Coverage {coverage:.0%}: not every tier answered", 100 * raw * 0.6 * (coverage - 1))),
+        "threat": _rows(
+            *((" + ".join(x.name for x in members) + " (independent vote)", 100 * t * w / total)
+              for t, w, members in groups),
+            ("Tier blend (60% fast, 40% slow) is above the average", 100 * (blended - consensus)),
+            ("High-confidence detection sets a floor", 100 * (floored - blended)),
+            ("Dirty surroundings set a floor", 100 * (networked - floored)),
+            ("Forged identity sets a floor", 100 * (threat - networked))),
+        "adjustments": adjustments(original, signals, scanner, shared),
+    }
 
     if gap > 0.1:
         direction = "emerging"
@@ -305,6 +354,7 @@ def compute(signals: list[Signal], now: datetime | None = None) -> dict:
         "explanation": explanation,
         "threat": round(threat, 3),
         "threat_label": threat_label(threat),
+        "ledger": ledger,
         "fast": fast,
         "slow": slow,
         "gap": round(gap, 3),

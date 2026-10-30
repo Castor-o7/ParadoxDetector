@@ -285,6 +285,50 @@ class ForgedIdentityTests(unittest.TestCase):
         self.assertLess(r["paradox"], 35)
 
 
+class LedgerTests(unittest.TestCase):
+    def assertAddsUp(self, r):
+        self.assertAlmostEqual(sum(x["points"] for x in r["ledger"]["paradox"]), r["paradox"], delta=0.1)
+        self.assertAlmostEqual(sum(x["points"] for x in r["ledger"]["threat"]), r["threat"] * 100, delta=0.1)
+
+    def labels(self, r, key):
+        return " | ".join(x["label"] for x in r["ledger"][key])
+
+    def test_every_kind_of_result_adds_up(self):
+        scanner = ScannerLabelTests()
+        rdns = sig("rdns", "context", None, 0.0)
+        rdns.facts["spoofed_identity"] = "reverse DNS claims Shodan, but it does not resolve back"
+        for r in (compute([sig("otx", "fast", 0.9, 0.9), sig("feodo", "fast", 0.95, 0.9),
+                           sig("spamhaus", "slow", 0.0, 0.5), sig("virustotal", "slow", 0.0, 0.8)], now=NOW),
+                  compute([sig("otx", "fast", 0.0, 0.9), sig("spamhaus", "slow", 0.9, 0.9)], now=NOW),
+                  compute([sig("otx", "fast", 0.9, 0.9), sig("spamhaus", "slow", None, 0.0, status="error")], now=NOW),
+                  compute(NetworkTests.CLEAN + net(0.9), now=NOW),
+                  compute([rdns, sig("otx", "fast", 0.0, 0.5), sig("spamhaus", "slow", 0.0, 0.5)], now=NOW),
+                  compute([sig("rdap", "context", None, 0.0)], now=NOW),
+                  scanner.scan(0.77, 0.74), scanner.scan(0.17, 0.14)):
+            self.assertAddsUp(r)
+
+    def test_names_the_claim_that_failed(self):
+        r = ScannerLabelTests().scan(0.17, 0.14)
+        self.assertIn("Veneer: GreyNoise benign: Shodan.io contradicted", self.labels(r, "paradox"))
+        self.assertEqual([a["beacon"] for a in r["ledger"]["adjustments"]], ["greynoise"])
+        self.assertEqual(r["ledger"]["adjustments"][0]["field"], "confidence")
+
+    def test_shows_what_the_scanner_label_discounted(self):
+        adjusted = ScannerLabelTests().scan(0.77, 0.74)["ledger"]["adjustments"]
+        self.assertEqual({a["beacon"]: a["to"] for a in adjusted}, {"abuseipdb": 0.23, "otx": 0.221})
+        self.assertIn("explains the 77%", adjusted[0]["why"])
+
+    def test_thin_coverage_is_a_negative_row(self):
+        r = compute([sig("otx", "fast", 0.9, 0.9), sig("spamhaus", "slow", None, 0.0, status="error")], now=NOW)
+        self.assertLess(r["ledger"]["paradox"][-1]["points"], 0)
+        self.assertIn("Coverage", r["ledger"]["paradox"][-1]["label"])
+
+    def test_shared_origin_beacons_share_one_row(self):
+        r = compute([sig("feodo", "fast", 0.9, 0.9), sig("threatfox", "fast", 0.9, 0.9),
+                     sig("spamhaus", "slow", 0.0, 0.5)], now=NOW)
+        self.assertIn("feodo + threatfox", self.labels(r, "threat"))
+
+
 class OtxQualityTests(unittest.TestCase):
     def otx(self, *pulses):
         return {"pulse_info": {"count": len(pulses), "pulses": list(pulses)}}
