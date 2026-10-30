@@ -364,8 +364,7 @@ and counts inside it. Choosing the allowed set is part of this story.
 
 The web UI (`paradox/web/index.html`) is one page with two modes: scan a single IP, or rank the
 IPs in a log. Each result shows a gauge, the evidence, a fast-vs-slow history chart for that IP,
-and the Claude summary. It hasn't changed since the app was packaged, while the engine has kept
-growing. These items catch the UI up, and give the views planned in other phases (1.5, 2.4, 3.3,
+and the Claude summary. These items catch the UI up, and give the views planned in other phases (1.5, 2.4, 3.3,
 4.2) a single place to live, so they don't each bolt a new panel onto the page.
 
 The rule for this phase: **the UI should never look more confident than the engine is.** A
