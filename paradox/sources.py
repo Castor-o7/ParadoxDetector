@@ -539,7 +539,15 @@ ECHO_ENGINES = re.compile(r"alienvault|abuse\.?ch|feodo|threatfox|urlhaus|spamha
 # (NEIGHBOR_LISTS). Counting them would let the score grade itself. CINS Army and
 # EmergingThreats are those lists; IPsum aggregates public lists and held 85-99%
 # of each one on 2026-10-30.
+VT_CONFIDENCE = 0.8
+VT_SINGLE_VENDOR_CONFIDENCE = 0.4
 LABEL_SOURCE_ENGINES = re.compile(r"^(cins army|emergingthreats|ipsum)$", re.IGNORECASE)
+
+
+def virustotal_confidence(malicious: int, suspicious: int) -> float:
+    """One vendor out of about 90 is a lead, not a verdict: keep it as evidence, but
+    below the bars for a confident detection and for contradicting a label."""
+    return VT_SINGLE_VENDOR_CONFIDENCE if malicious + suspicious == 1 else VT_CONFIDENCE
 
 
 def check_virustotal(ip: str, sig: Signal) -> None:
@@ -562,7 +570,7 @@ def check_virustotal(ip: str, sig: Signal) -> None:
     cats = [r.get("category") for r in independent.values()]
     mal, sus, engines = cats.count("malicious"), cats.count("suspicious"), len(independent)
     sig.threat = round(min(1.0, (mal + 0.5 * sus) / 5), 3)
-    sig.confidence = 0.8
+    sig.confidence = virustotal_confidence(mal, sus)
     sig.last_seen = iso_date(parse_dt(attrs.get("last_analysis_date")))
     sig.link = f"https://www.virustotal.com/gui/ip-address/{ip}"
     sig.summary = f"{mal} malicious / {sus} suspicious of {engines} independent vendors"
