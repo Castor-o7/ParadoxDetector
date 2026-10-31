@@ -337,15 +337,19 @@ assistant can call. It speaks MCP over stdio using only the standard library.
 | Tool | What it does |
 |---|---|
 | `scan_ip` | Full paradox report for one IP |
-| `scan_log` | Rank the IPs in log text or a local log file |
+| `scan_log` | Rank the IPs in log text, or a log file in an allowed folder |
 | `ip_history` | Recorded scans and measured beacon lag |
 | `beacon_status` | Which beacons are configured, which keys are set, and how each last answered |
 
 **Threat model for agents.** Beacon text is written by third parties, possibly the attacker being
 investigated, so treat it as data:
 
-- **What the tools can read:** `scan_log` can read any local file its path names, with the permissions
-  of the user running the server. Results contain only IPs, counts and scores, never raw log lines.
+- **What the tools can read:** `scan_log`'s `path` reads only files inside `/var/log`. To change that,
+  set `PARADOX_LOG_DIRS` to absolute folders separated by `:` (`;` on Windows), or leave it empty to allow
+  none. It replaces the default rather than adding to it. Symlinks and `..` can't leave those folders, and a
+  path outside them gets the same refusal whether or not the file exists. Pasting the log as `text` needs no
+  setup, and `paradox log` isn't limited. Inside the folders the server reads with its user's permissions.
+  Results contain only IPs, counts and scores, never raw log lines.
 - **Untrusted fields:** the output schemas of `scan_ip` and `scan_log` mark every field that can carry
   third-party text with `"x-untrusted": true`.
 - **Size:** every returned string is capped at 1,000 characters.
