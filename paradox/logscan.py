@@ -84,6 +84,7 @@ def row(ip: str, info: dict, report: dict | None, error: str | None = None) -> d
             "threat": sc["threat"], "threat_label": sc["threat_label"],
             "veneer": sc["veneer"].get("labels") if sc["veneer"].get("active") else [],
             "network_risk": sc["network"].get("risk"),
+            "paced": [m["beacon"] for m in sc.get("missing", []) if m.get("failure") == "paced"],
             "explanation": sc["explanation"]}
 
 
@@ -127,6 +128,7 @@ def scan_lines(lines: Iterable[str], limit: int = DEFAULT_LIMIT, min_hits: int =
                     "not_scanned": len(candidates) - len(chosen),
                     "below_min_hits": len(found["public"]) - len(candidates),
                     "errors": sum(r.get("error") is not None for r in results),
+                    "paced": sum(bool(r.get("paced")) for r in results),
                     "flags": flags, "elapsed_s": round(time.monotonic() - started, 1)},
         "results": results,
     }
@@ -141,6 +143,8 @@ def render(result: dict) -> str:
         + (f", {s['not_scanned']} less active IPs not scanned (raise --limit)" if s["not_scanned"] else ""),
         f"  veneer {f['veneer']}   paradox {f['paradox']}   threat {f['threat']}   watch {f['watch']}"
         + (f"   errors {s['errors']}" if s["errors"] else ""),
+        *([f"  {s['paced']} IPs got no VirusTotal lookup because of its free limits, so their slow tier is "
+           "thinner and they don't compare with the rest (marked *)"] if s["paced"] else []),
         "",
         f"  {'flag':<8}{'ip':<40}{'hits':>6}{'paradox':>9}{'threat':>8}  verdict",
     ]
@@ -151,13 +155,15 @@ def render(result: dict) -> str:
         verdict = f"{r['paradox_label']} [{r['direction']}], {r['threat_label']}"
         if r["veneer"]:
             verdict += "  - borrowed reputation: " + "; ".join(r["veneer"])
+        if r.get("paced"):
+            verdict += " *"
         lines.append(f"  {r['flag'].upper() or '-':<8}{r['ip']:<40}{r['hits']:>6}{r['paradox']:>9.1f}"
                      f"{r['threat'] * 100:>8.0f}  {verdict}")
     return "\n".join(lines) + "\n"
 
 
 CSV_FIELDS = ["flag", "ip", "hits", "paradox", "paradox_label", "direction", "threat", "threat_label",
-              "network_risk", "veneer", "first_line", "last_line", "error", "explanation"]
+              "network_risk", "veneer", "paced", "first_line", "last_line", "error", "explanation"]
 
 
 def to_csv(result: dict, out) -> None:
@@ -165,4 +171,4 @@ def to_csv(result: dict, out) -> None:
     w = csv.DictWriter(out, fieldnames=CSV_FIELDS, extrasaction="ignore")
     w.writeheader()
     for r in result["results"]:
-        w.writerow({**r, "veneer": "; ".join(r.get("veneer") or [])})
+        w.writerow({**r, "veneer": "; ".join(r.get("veneer") or []), "paced": "; ".join(r.get("paced") or [])})

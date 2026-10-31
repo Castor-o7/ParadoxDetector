@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from . import config
+from . import quota
 from .net import cached, fetch, fetch_json
 
 
@@ -109,6 +110,10 @@ class RateLimited(BeaconError):
 
 class BadKey(BeaconError):
     failure = "bad_key"
+
+
+class Paced(BeaconError):
+    failure = "paced"
 
 
 def _expect_ok(status: int, data, what: str) -> None:
@@ -541,6 +546,7 @@ ECHO_ENGINES = re.compile(r"alienvault|abuse\.?ch|feodo|threatfox|urlhaus|spamha
 # of each one on 2026-10-30.
 VT_CONFIDENCE = 0.8
 VT_SINGLE_VENDOR_CONFIDENCE = 0.4
+VT_CACHE_SECONDS = 3600
 LABEL_SOURCE_ENGINES = re.compile(r"^(cins army|emergingthreats|ipsum)$", re.IGNORECASE)
 
 
@@ -550,10 +556,23 @@ def virustotal_confidence(malicious: int, suspicious: int) -> float:
     return VT_SINGLE_VENDOR_CONFIDENCE if malicious + suspicious == 1 else VT_CONFIDENCE
 
 
+def fetch_virustotal(ip: str) -> dict:
+    """The raw answer, so a change to the vendor rules applies to cached readings too. Only
+    good answers are cached, and a cached one spends no quota."""
+    def load():
+        try:
+            quota.reserve()
+        except quota.OutOfQuota as err:
+            raise Paced(str(err)) from None
+        status, body = fetch_json(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}",
+                                  headers={"x-apikey": config.key("VIRUSTOTAL_API_KEY") or ""})
+        _expect_ok(status, body, "VirusTotal")
+        return body
+    return cached("virustotal_" + ip.replace(":", "_"), VT_CACHE_SECONDS, load)
+
+
 def check_virustotal(ip: str, sig: Signal) -> None:
-    status, body = fetch_json(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}",
-                              headers={"x-apikey": config.key("VIRUSTOTAL_API_KEY") or ""})
-    _expect_ok(status, body, "VirusTotal")
+    body = fetch_virustotal(ip)
     attrs = (body.get("data") or {}).get("attributes") or {}
     results = attrs.get("last_analysis_results") or {}
     # VirusTotal's vendor list includes feeds this app already queries directly

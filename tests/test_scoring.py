@@ -1,10 +1,24 @@
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest import mock
 
+from paradox import config, quota, sources as _sources
 from paradox.scoring import compute
 from paradox.sources import Signal, abuse_scan_share, otx_scan_share, pulse_role, score_otx
 
 NOW = datetime(2026, 10, 27, tzinfo=timezone.utc)
+
+
+def setUpModule():
+    """VirusTotal parser tests stub the HTTP call; keep them off the real quota ledger and cache."""
+    tmp = tempfile.TemporaryDirectory()
+    unittest.addModuleCleanup(tmp.cleanup)
+    for patch in (mock.patch.object(quota, "reserve"), mock.patch.object(_sources, "VT_CACHE_SECONDS", 0),
+                  mock.patch.object(config, "CACHE_DIR", Path(tmp.name))):
+        patch.start()
+        unittest.addModuleCleanup(patch.stop)
 
 
 def sig(source, tier, threat, confidence, status="ok", last_seen=None, benign_label=None):

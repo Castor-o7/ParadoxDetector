@@ -106,7 +106,7 @@ TOOLS = [
         "description": (
             "Extract every public IP from log text or a local log file, scan the most active ones, and "
             "rank them: borrowed reputation (veneer) first, then paradox, then plain threat. Slow for big "
-            "limits - each IP queries every beacon. Provide exactly one of text or path."),
+            "limits - each IP queries every beacon, and VirusTotal allows one new lookup every 15 seconds. Provide exactly one of text or path."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -135,7 +135,7 @@ TOOLS = [
         "name": "beacon_status",
         "title": "List beacons and API key status",
         "description": ("Which beacons are configured, their tier, whether each needed API key is set, and "
-                        "how each last answered in this process (ok, rate_limited, bad_key, error, untested)."),
+                        "how each last answered in this process (ok, rate_limited, paced, bad_key, error, untested)."),
         "inputSchema": {"type": "object", "properties": {}},
         "annotations": {"readOnlyHint": True, "openWorldHint": False},
     },
@@ -184,7 +184,7 @@ def redact_report(c: dict) -> dict:
 
 def redact_log(result: dict) -> dict:
     keys = ("ip", "hits", "first_line", "last_line", "flag", "paradox", "paradox_label", "direction",
-            "threat", "threat_label", "network_risk")
+            "threat", "threat_label", "network_risk", "paced")
     return {"summary": result["summary"], "redacted": True, "note": REDACTED,
             "results": [{**{k: r.get(k) for k in keys}, "failed": r.get("error") is not None}
                         for r in result["results"]]}

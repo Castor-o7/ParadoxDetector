@@ -269,6 +269,21 @@ Some sources share upstream data, and two copies of one observation shouldn't lo
   double-counted".
 - A veneer contradiction must come from a different *origin* than the label it contradicts.
 
+### VirusTotal's free limits
+
+The free tier allows **4 lookups a minute, 500 a day and 15.5K a month**, and it rules out business workflows,
+commercial products and services. The detector stays inside those limits on its own:
+
+- **Lookups wait their turn,** one every 15 seconds, because an IP scored without VirusTotal has a thinner slow
+  tier and doesn't compare with the rest. A 25-IP log scan with nothing cached takes at least 6 minutes.
+- **A lookup that would wait more than 60 seconds is skipped,** and so is any lookup once the day's or month's
+  allowance is used (counted in UTC). The report lists VirusTotal as missing and says why, and `paradox log` marks
+  those IPs. `PARADOX_VT_MAX_WAIT` changes the limit, and `0` means never wait, which is faster but leaves gaps.
+- **Good answers are reused for an hour** and spend no quota, even on a fresh scan, so a reading can be up to an
+  hour old. Failed lookups aren't reused, and they count against the allowance.
+- **The count is shared** by the watcher, web app and MCP server on one machine (not on Windows, where only threads
+  in one process share it). It can't see lookups made with the same key elsewhere.
+
 ### History and lag
 
 Every fresh scan is saved to `history.sqlite3` in the app's home directory. For each IP, the app records when each beacon
@@ -413,7 +428,7 @@ paradox.example.edu {
 }
 ```
 
-Then set `PARADOX_TRUST_PROXY=1`. A 25-IP log scan can take a few minutes (5 IPs took 43 s here), so log scans run as background
+Then set `PARADOX_TRUST_PROXY=1`. A 25-IP log scan takes at least 6 minutes with a VirusTotal key and nothing cached, and a few minutes without one (5 IPs took 43 s here), so log scans run as background
 jobs that the page polls, so proxy timeouts don't cut them off.
 
 ## CI/CD
