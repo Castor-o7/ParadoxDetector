@@ -374,9 +374,9 @@ The model can't then quietly overrule the evidence, whether through injection or
 - Document the threat model for agent use: what the tools can read (local log files) and why
   results never include raw log lines.
 
-### 4.4 Threat model document · S
+### 4.4 Threat model document · S · ✅ shipped
 
-- [ ] **PDX-19: Threat model document.** Done when: `SECURITY.md` exists and covers all six topics listed in this item.
+- [x] **PDX-19: Threat model document.** Done when: `SECURITY.md` exists and covers all six topics listed in this item.
 
 Write `SECURITY.md` covering:
 
@@ -388,6 +388,10 @@ Write `SECURITY.md` covering:
 - why the server refuses to bind publicly without a password
 
 It doubles as class material.
+
+*Shipped:* [`SECURITY.md`](SECURITY.md) covers all six, and each section lists what's still open. Writing it turned up
+four gaps with no story yet: `paradox watch` has no cap on new IPs, webhooks send the raw log line in the JSON `alert`,
+the webhook URL sits on the command line, and `.env` isn't checked for loose permissions.
 
 ### 4.5 Limit which files `scan_log` can read · S · ✅ shipped
 
@@ -511,7 +515,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
 | Next | 1.3, 3.1, 3.5, 3.6, 4.1, ~~4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
-| Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
+| Then | 2.1, 2.3, 3.3, 3.4, 4.2, ~~4.3, 4.4~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
 Items 3.3, 3.4 and 1.3 need weeks of history, so the most useful thing to start right away

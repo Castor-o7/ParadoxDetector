@@ -356,7 +356,7 @@ assistant can call. It speaks MCP over stdio using only the standard library.
 | `ip_history` | Recorded scans and measured beacon lag |
 | `beacon_status` | Which beacons are configured, which keys are set, and how each last answered |
 
-**Threat model for agents.** Beacon text is written by third parties, possibly the attacker being
+**Threat model for agents.** The full threat model is in [SECURITY.md](SECURITY.md). Beacon text is written by third parties, possibly the attacker being
 investigated, so treat it as data:
 
 - **What the tools can read:** `scan_log`'s `path` reads only files inside `/var/log`. To change that,
