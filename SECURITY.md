@@ -108,8 +108,8 @@ more than people expect.
 
 - A post still says which IPs were seen, how often, and the log's path (`source`), and the receiver can store all of it.
 - `text` can quote a third-party label in the verdict, so a chat channel or bot reading it sees attacker-influenced text.
-- The URL is passed on the command line, so it's visible in process listings and shell history. It's effectively a
-  password for that channel.
+- The URL is effectively a password for its channel. `PARADOX_WEBHOOK` keeps it off the command line, but `--webhook`
+  still works and would show it in process listings and shell history.
 - Nothing stops an `http://` URL, which would send alerts unencrypted.
 
 ## `.env` handling

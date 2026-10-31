@@ -186,7 +186,7 @@ def cmd_watch(args) -> int:
         print(f"error: unknown --alert-on flag(s): {', '.join(sorted(bad))}", file=sys.stderr)
         return 2
     w = Watcher(min_hits=args.min_hits, rescan_after_h=args.rescan_after, alert_on=alert_on,
-                workers=args.workers, webhook=args.webhook, as_json=args.json, max_new_per_hour=args.max_new_per_hour)
+                workers=args.workers, webhook=args.webhook or config.key("PARADOX_WEBHOOK"), as_json=args.json, max_new_per_hour=args.max_new_per_hour)
     return w.run(args.log or [], from_start=args.from_start, rescan_every_h=args.rescan_every)
 
 
@@ -295,7 +295,8 @@ def parser() -> argparse.ArgumentParser:
                    help="also rescan every tracked IP on this interval (0 = off)")
     p.add_argument("--alert-on", default=",".join(ALERT_FLAGS),
                    help="comma-separated flags that alert (default veneer,paradox,threat; add watch)")
-    p.add_argument("--webhook", metavar="URL", help="POST each alert as JSON (Slack-compatible 'text')")
+    p.add_argument("--webhook", metavar="URL", help="POST each alert as JSON (Slack-compatible 'text'); prefer PARADOX_WEBHOOK, "
+                   "since a URL here shows in process listings and shell history")
     p.add_argument("--workers", type=int, default=2, help="concurrent scans (default 2)")
     p.add_argument("--max-new-per-hour", type=int, default=15, metavar="N",
                    help="scan at most this many new IPs an hour; the rest wait until seen again (default 15, 0 = off)")
