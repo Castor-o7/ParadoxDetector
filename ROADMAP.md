@@ -382,9 +382,9 @@ Write `SECURITY.md` covering:
 
 It doubles as class material.
 
-### 4.5 Limit which files `scan_log` can read · S
+### 4.5 Limit which files `scan_log` can read · S · ✅ shipped
 
-- [ ] **PDX-29: Limit `scan_log`'s file access.** Done when: `scan_log`'s `path` argument reads only files inside an allowed set stated plainly in the README, symlinks and `..` can't escape it, a test shows a path outside the set is refused without its contents or existence being revealed, and the `text` argument still works without any configuration.
+- [x] **PDX-29: Limit `scan_log`'s file access.** Done when: `scan_log`'s `path` argument reads only files inside an allowed set stated plainly in the README, symlinks and `..` can't escape it, a test shows a path outside the set is refused without its contents or existence being revealed, and the `text` argument still works without any configuration.
 
 An agent that gets injected can point `scan_log` at any local file the server's user can read, and learn the IPs
 and counts inside it. Choosing the allowed set is part of this story.
@@ -392,6 +392,17 @@ and counts inside it. Choosing the allowed set is part of this story.
 - **Trade-off:** analysts keep logs in arbitrary places, so a limit adds setup or refusals for legitimate scans,
   and pasting text is the fallback. A default that's too narrow gets switched off; one that's too wide protects
   little. The CLI's `paradox log` isn't an agent interface and isn't affected.
+
+*Shipped:* the allowed set is `/var/log` unless `PARADOX_LOG_DIRS` names other folders. The agent's working
+folder is deliberately left out, because that's often a project holding a `.env`. A path is checked as written
+before the filesystem is touched and again with symlinks followed, `..` is refused outright, and every refusal
+reads the same.
+
+*Downside:* a log kept anywhere else now needs `PARADOX_LOG_DIRS` or pasting, and pasted text is limited by what
+the client can send. Setting the variable to `/` switches the protection off.
+
+*Not covered:* a process that can already write inside an allowed folder could swap a file for a symlink between
+the check and the read. A file inside an allowed folder can still be read, including any secrets in it.
 
 ---
 
@@ -492,7 +503,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, 4.5, ~~1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 1.7, 3.1, 3.5, 3.6, 4.1, ~~4.5, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, 4.4, ~~4.3~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
