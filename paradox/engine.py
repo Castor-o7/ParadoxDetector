@@ -73,7 +73,7 @@ def cached_report(ip: str) -> dict | None:
 
 def beacon_status() -> list[dict]:
     """Configuration, plus how each beacon last answered: ok, no_key, rate_limited,
-    bad_key, error, or untested if this process hasn't scanned with it yet."""
+    paced, bad_key, error, or untested if this process hasn't scanned with it yet."""
     out = []
     for b in BEACONS:
         key_set = bool(b.key_env and config.key(b.key_env))
