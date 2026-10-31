@@ -102,6 +102,8 @@ more than people expect.
 
 - The Slack-compatible `text` field holds only the flag, IP, scores and verdict. The raw `sample` log line is removed
   from everything posted, and appears only in `--json` stdout on your own machine.
+- The watcher won't start with a webhook that isn't `https://` or `http://` on loopback, and the refusal doesn't quote
+  the URL.
 - Webhooks are opt-in, and a failed post is reported on stderr without stopping the watcher.
 
 **Open:**
@@ -110,7 +112,8 @@ more than people expect.
 - `text` can quote a third-party label in the verdict, so a chat channel or bot reading it sees attacker-influenced text.
 - The URL is effectively a password for its channel. `PARADOX_WEBHOOK` keeps it off the command line, but `--webhook`
   still works and would show it in process listings and shell history.
-- Nothing stops an `http://` URL, which would send alerts unencrypted.
+- `PARADOX_WEBHOOK_ALLOW_HTTP=1` allows unencrypted posts when someone sets it, and a server's redirect is followed
+  without this check.
 
 ## `.env` handling
 

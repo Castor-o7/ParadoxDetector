@@ -44,6 +44,29 @@ class LegacyCliTests(unittest.TestCase):
         self.assertEqual(self.watch_webhook("--webhook", "https://example.test/flag", env=env), "https://example.test/flag")
         self.assertIsNone(self.watch_webhook())
 
+    def test_webhook_schemes(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("PARADOX_WEBHOOK_ALLOW_HTTP", None)
+            for ok in ("https://example.test/x", "http://localhost:9/x", "http://127.0.0.1:9/x", "http://[::1]:9/x"):
+                self.assertIsNone(watch.webhook_problem(ok), ok)
+            for bad in ("http://example.test/secret", "http://127.0.0.1.example.test/secret", "file:///etc/secret",
+                        "ftp://example.test/secret", "https:///secret", "secret"):
+                problem = watch.webhook_problem(bad)
+                self.assertTrue(problem, bad)
+                self.assertNotIn("secret", problem)
+            os.environ["PARADOX_WEBHOOK_ALLOW_HTTP"] = "1"
+            self.assertIsNone(watch.webhook_problem("http://example.test/x"))
+            self.assertTrue(watch.webhook_problem("file:///etc/secret"))    # the override is for http only
+
+    def test_watcher_wont_start_with_an_unencrypted_webhook(self):
+        with mock.patch.dict(os.environ, {"PARADOX_WEBHOOK": "http://example.test/secret"}), \
+                mock.patch.object(watch, "Watcher") as w, mock.patch("sys.stderr", io.StringIO()) as err:
+            os.environ.pop("PARADOX_WEBHOOK_ALLOW_HTTP", None)
+            self.assertEqual(cli.main(["watch", "--log", "a"]), 2)
+        w.assert_not_called()
+        self.assertIn("unencrypted", err.getvalue())
+        self.assertNotIn("secret", err.getvalue())
+
     def test_scan_exit_status_reflects_findings(self):
         def run(score):
             with mock.patch.object(cli, "scan", return_value={"ip": "45.1.1.1", "score": score}), \
