@@ -125,6 +125,22 @@ class LaunderingTests(AttackCase):
         self.assertScore(result, 93.1, 0.765)
         self.assertTrue(result["veneer"]["active"])
 
+    def test_guarantee_a_label_isnt_contradicted_by_its_own_origin(self):
+        """Feodo and ThreatFox are both abuse.ch: one source disagreeing with itself isn't independent evidence."""
+        label = Signal("feodo", "Feodo", "fast", threat=0.0, confidence=0.9, facts={"benign_label": "abuse.ch vouched"})
+        hit = Signal("threatfox", "ThreatFox", "fast", threat=0.9, confidence=0.9, last_seen=RECENT)
+        self.assertFalse(score(otx(), label, hit)["veneer"]["active"])
+        outside = Signal("virustotal", "VirusTotal", "slow", threat=0.9, confidence=0.8, last_seen=RECENT)
+        self.assertTrue(score(otx(), label, virustotal=outside)["veneer"]["active"])
+
+    def test_guarantee_stale_evidence_cant_contradict_a_label(self):
+        """An old report shouldn't paint a label as borrowed; only fresh or live evidence can."""
+        old = (NOW - timedelta(days=200)).date().isoformat()
+        hit = Signal("virustotal", "VirusTotal", "slow", threat=0.9, confidence=0.8, last_seen=old)
+        self.assertFalse(score(otx(), greynoise=benign_greynoise(), virustotal=hit)["veneer"]["active"])
+        hit = Signal("virustotal", "VirusTotal", "slow", threat=0.9, confidence=0.8, last_seen=RECENT)
+        self.assertTrue(score(otx(), greynoise=benign_greynoise(), virustotal=hit)["veneer"]["active"])
+
     def test_known_weakness_otx_whitelist_clears_otx_only_evidence(self):
         """PDX-39. When OTX is the only witness, its own whitelist entry drops it from Severe paradox and Malicious
         to Coherent and Suspicious, and no veneer fires, because a label can't be contradicted by its own origin."""
@@ -156,8 +172,8 @@ class DilutionTests(AttackCase):
             self.assertEqual(result["threat_label"], "Malicious", size)
 
     def test_known_weakness_padding_hides_otx_only_evidence(self):
-        """PDX-38's other edge. If every pulse naming an IP is huge, OTX-only evidence fades to Likely benign. That's
-        the discount working on sandbox dumps, and also what a bad actor's own padded feed would get."""
+        """PDX-40. If every pulse naming an IP is huge, OTX-only evidence fades to Likely benign. That's the discount
+        working on sandbox dumps, and also what an attacker gets if the only reports are ones it padded."""
         for size, paradox, threat, threat_label in ((1_000, 60.3, 0.689, "Likely malicious"),
                                                     (3_000, 38.6, 0.441, "Likely malicious"),
                                                     (20_000, 12.1, 0.138, "Likely benign"),
