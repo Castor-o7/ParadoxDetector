@@ -77,6 +77,10 @@ journalctl -fu sshd | paradox watch --log -
 paradox watch --rescan-every 6             # no logs: keep tracked IPs fresh (replaces cron)
 ```
 
+At most 15 new IPs an hour get scanned (`--max-new-per-hour`, `0` for no limit), because forged addresses in a log
+would otherwise spend the day's VirusTotal lookups. An IP over the limit waits until it's seen again after that, so a
+flood can delay or hide a real attacker that appears only once. The limit resets when the watcher restarts.
+
 An alert fires when an IP's flag enters the alert set (`--alert-on`, default
 `veneer,paradox,threat`) or changes, not on every sighting. Alerts go to stdout (one JSON object
 per line with `--json`) and, with `--webhook`, are POSTed as JSON. The payload's `text` field works

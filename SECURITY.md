@@ -31,13 +31,14 @@ an IP's paradox can rise.
   reuse of good answers. The count is shared by processes on one machine.
 - The web server limits scans and summaries per client (`PARADOX_RATE_LIMIT`, default 20 a minute) and runs at most 2
   log scans at once, each up to 50 IPs and 5 MB.
+- `paradox watch` scans at most 15 new IPs an hour (`--max-new-per-hour`). A flood can still delay or hide a real
+  attacker that appears only once, and the limit resets when the watcher restarts.
 - A report lists each beacon that gave no reading, why, and what that costs, so a thin result says so.
 
 **Open:**
 
 - Only VirusTotal has a budget. The other beacons rely on their providers' own limits.
-- `paradox watch` has no cap on new IPs, so a log flooded with addresses can use up the day's VirusTotal lookups and
-  leave later IPs without them.
+- Rescans of tracked IPs aren't capped, so a long tracked list can still reach VirusTotal's daily limit.
 - The rate limit is in memory and per client, so it resets on restart and many clients get many allowances. With
   `PARADOX_TRUST_PROXY=1` it trusts `X-Forwarded-For`, which is only safe when a proxy sets that header.
 - Lookups made with the same key on another machine aren't counted.

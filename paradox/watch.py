@@ -5,7 +5,9 @@
     paradox watch --rescan-every 6                  # no logs: just keep tracked IPs fresh
 
 Each public IP is scanned once it reaches --min-hits, then again only after
---rescan-after hours, so a busy log doesn't hammer the beacons. An alert is
+--rescan-after hours, so a busy log doesn't hammer the beacons. --max-new-per-hour
+caps how many new IPs get scanned, so a log full of forged addresses can't spend
+the day's quota. An alert is
 emitted when an IP's flag (veneer, paradox, threat, watch) enters the alert set
 or changes, as a line on stdout (JSON with --json) and, optionally, a POST to
 --webhook. The payload's "text" field makes Slack/Mattermost incoming webhooks
@@ -22,12 +24,14 @@ import sys
 import threading
 import time
 import urllib.request
+from collections import deque
 from datetime import datetime, timezone
 from typing import Callable, Iterator, TextIO
 
 from . import engine, history, logscan
 
 DEFAULT_ALERTS = ("veneer", "paradox", "threat")
+DEFAULT_MAX_NEW = 15    # new IPs scanned an hour: 360 a day, inside VirusTotal's 500 with room for rescans
 QUEUE_LIMIT = 1000
 
 
@@ -99,7 +103,7 @@ def stream(src: TextIO, stop: threading.Event) -> Iterator[str]:
 class Watcher:
     def __init__(self, *, min_hits: int = 1, rescan_after_h: float = 24, alert_on=DEFAULT_ALERTS,
                  workers: int = logscan.DEFAULT_WORKERS, webhook: str | None = None, as_json: bool = False,
-                 out: TextIO = sys.stdout, scanner: Callable[..., dict] | None = None):
+                 max_new_per_hour: int = DEFAULT_MAX_NEW, out: TextIO = sys.stdout, scanner: Callable[..., dict] | None = None):
         self.min_hits, self.rescan_after = min_hits, rescan_after_h * 3600
         self.alert_on, self.webhook, self.as_json, self.out = set(alert_on), webhook, as_json, out
         self.scanner = scanner or engine.scan
@@ -110,7 +114,10 @@ class Watcher:
         self.pending: set[str] = set()
         self.q: queue.Queue[str] = queue.Queue(QUEUE_LIMIT)
         self.lock = threading.Lock()
-        self.stats = {"lines": 0, "scans": 0, "alerts": 0, "dropped": 0, "errors": 0}
+        self.max_new = max_new_per_hour
+        self.new_scans: deque[float] = deque()
+        self.warned_capped = False
+        self.stats = {"lines": 0, "scans": 0, "alerts": 0, "dropped": 0, "errors": 0, "capped": 0}
         self.workers = [threading.Thread(target=self._work, daemon=True) for _ in range(max(1, workers))]
 
     # -- input -------------------------------------------------------------
@@ -127,10 +134,33 @@ class Watcher:
                 info["sample"] = line.strip()[:300]
                 due = (info["hits"] >= self.min_hits and ip not in self.pending
                        and time.time() - self.last_scan.get(ip, 0) >= self.rescan_after)
+                capped = due and ip not in self.last_scan and not self._new_scan_allowed()
+                if capped:
+                    due = False
+                    self.stats["capped"] += 1
+                warn = capped and not self.warned_capped
+                if warn:
+                    self.warned_capped = True
                 if due:
                     self.pending.add(ip)
+            if warn:
+                print(f"watch: {self.max_new} new IPs scanned this hour, the limit; others wait until they're seen "
+                      "again after that. Forged addresses in a log can cause this.", file=sys.stderr)
             if due:
                 self._enqueue(ip)
+
+    def _new_scan_allowed(self) -> bool:
+        """A log can name endless addresses, and each scan spends quota. Call with the lock held."""
+        if self.max_new <= 0:
+            return True
+        now = time.time()
+        while self.new_scans and now - self.new_scans[0] >= 3600:
+            self.new_scans.popleft()
+            self.warned_capped = False
+        if len(self.new_scans) >= self.max_new:
+            return False
+        self.new_scans.append(now)
+        return True
 
     def _enqueue(self, ip: str) -> None:
         try:
@@ -237,7 +267,8 @@ class Watcher:
         s = self.stats
         print(f"watch: stopped. {s['lines']} lines, {len(self.seen)} public IPs, {s['scans']} scans, "
               f"{s['alerts']} alerts" + (f", {s['errors']} errors" if s["errors"] else "")
-              + (f", {s['dropped']} dropped" if s["dropped"] else ""), file=sys.stderr)
+              + (f", {s['dropped']} dropped" if s["dropped"] else "")
+              + (f", {s['capped']} sightings over the new-IP limit" if s["capped"] else ""), file=sys.stderr)
         return 1 if s["alerts"] else 0
 
     def _pump(self, lines: Iterator[str], source: str) -> None:

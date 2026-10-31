@@ -393,6 +393,41 @@ It doubles as class material.
 four gaps with no story yet: `paradox watch` has no cap on new IPs, webhooks send the raw log line in the JSON `alert`,
 the webhook URL sits on the command line, and `.env` isn't checked for loose permissions.
 
+### 4.6 Cap new-IP scans in `paradox watch` · S · ✅ shipped
+
+- [x] **PDX-33: Cap new-IP scans.** Done when: a test floods the watcher with 100 forged IPs and only the cap's worth get queued, a rescan isn't counted or blocked, an IP over the cap gets its turn when seen again after the hour, and the README states the cap and its downside.
+
+Found while writing the threat model. `paradox watch` scans each new public IP it sees, so forged source addresses
+in a log could spend the day's VirusTotal lookups.
+
+*Shipped:* 15 new IPs an hour by default (`--max-new-per-hour`), which is 360 a day and leaves room inside
+VirusTotal's 500 for rescans.
+
+*Downside:* a flood can delay a real attacker, and one that appears only once may never be scanned. The count resets
+on restart. Not measured against a real log, so 15 may be too low for a busy one; the watcher warns on stderr when it
+hits the limit, once per stretch at the limit.
+
+### 4.7 Keep raw log lines out of webhook posts · S
+
+- [ ] **PDX-34: Webhooks don't send log lines.** Done when: a test shows a webhook POST contains no `sample` and none of the log line's text, stdout's `--json` output is unchanged, and the README and `SECURITY.md` say so.
+
+The JSON `alert` includes the raw log line, which can hold usernames, internal hostnames or tokens, and it goes to a
+third party.
+
+### 4.8 Webhook URL out of the command line · S
+
+- [ ] **PDX-35: Read the webhook URL from the environment.** Done when: `PARADOX_WEBHOOK` sets the URL, a test shows it's used without `--webhook`, and the README's examples use it and say why.
+
+The URL works like a password for its channel, and on the command line it shows up in process listings and shell history.
+
+### 4.9 Refuse unencrypted webhooks · S
+
+- [ ] **PDX-36: Refuse `http://` webhooks.** Done when: the watcher refuses to start with a non-HTTPS webhook unless it points at loopback or an explicit override is set, with tests for each case.
+
+### 4.10 Warn about a loose `.env` · S
+
+- [ ] **PDX-37: Warn about `.env` permissions.** Done when: loading a `.env` readable by group or others prints one warning to stderr without the file's contents, a mode 600 file prints none, a test covers both, and platforms without POSIX modes are handled.
+
 ### 4.5 Limit which files `scan_log` can read · S · ✅ shipped
 
 - [x] **PDX-29: Limit `scan_log`'s file access.** Done when: `scan_log`'s `path` argument reads only files inside an allowed set stated plainly in the README, symlinks and `..` can't escape it, a test shows a path outside the set is refused without its contents or existence being revealed, and the `text` argument still works without any configuration.
@@ -514,7 +549,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 3.1, 3.5, 3.6, 4.1, ~~4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.5, 3.6, 4.1, 4.7, 4.8, 4.9, 4.10, ~~4.6, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, ~~4.3, 4.4~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 
