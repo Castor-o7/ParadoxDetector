@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -461,6 +462,69 @@ class ThinReportTests(unittest.TestCase):
                                                 "confidence": 0.75, "summary": "Abuse confidence 36% from 8 reports by 7 users (90d)"}]}
         abuse = next(s for s in calibrate.build_signals("45.1.1.1", saved) if s.source == "abuseipdb")
         self.assertEqual(abuse.facts["reporters"], 7)
+
+
+class RescoreAsOfTests(unittest.TestCase):
+    """PDX-28: a saved scan gets the same score whatever day it's rescored."""
+
+    PULSES = {"pulse_info": {"count": 3, "pulses": [
+        {"author": {"username": f"a{i}"}, "name": "attack campaign", "modified": "2026-10-20T00:00:00+00:00",
+         "indicator_type_counts": {"IPv4": 20}} for i in range(3)]}, "validation": []}
+
+    def rescore(self, saved, today, **kwargs):
+        """Run the real collect and evaluate with the clock set to `today`."""
+        from paradox import calibrate, sources as src
+        import paradox.scoring as sc
+
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return today
+
+        with tempfile.TemporaryDirectory() as d:
+            scans = Path(d)
+            (scans / "45.1.1.1.json").write_text(json.dumps(saved))
+            with mock.patch.object(calibrate, "SCANS", scans), mock.patch.object(src, "datetime", Clock), \
+                    mock.patch.object(sc, "datetime", Clock):
+                signals, times, undated = calibrate.collect(["45.1.1.1"], 0, offline=True, **kwargs)
+                row = calibrate.evaluate({"malicious": ["45.1.1.1"], "benign": []}, signals, times)
+        return row["threat_mean"]["malicious"], row["paradox_mean"]["malicious"], undated
+
+    def saved(self, **fields):
+        abuse = {"source": "abuseipdb", "name": "a", "tier": "fast", "threat": 0.9, "confidence": 0.8,
+                 "last_seen": "2026-10-20", "facts": {"reporters": 5}, "summary": "x"}
+        return {"otx_raw": self.PULSES, "signals": [abuse], "otx_error": None, **fields}
+
+    DAY1, DAY2 = datetime(2026, 10, 21, tzinfo=timezone.utc), datetime(2027, 6, 1, tzinfo=timezone.utc)
+
+    def test_dated_scan_scores_the_same_on_any_day(self):
+        saved = self.saved(scanned_at="2026-10-21T00:00:00+00:00")
+        first, later = self.rescore(saved, self.DAY1), self.rescore(saved, self.DAY2)
+        self.assertEqual(first, later)
+        self.assertEqual(first[2], [])
+
+    def test_undated_scan_is_reported_and_drifts(self):
+        first, later = self.rescore(self.saved(), self.DAY1), self.rescore(self.saved(), self.DAY2)
+        self.assertEqual(first[2], ["45.1.1.1"])
+        self.assertNotEqual(first[:2], later[:2])
+
+    def test_as_of_fixes_an_undated_scan_without_hiding_it(self):
+        fixed = self.DAY1
+        first = self.rescore(self.saved(), self.DAY1, undated_as_of=fixed)
+        later = self.rescore(self.saved(), self.DAY2, undated_as_of=fixed)
+        self.assertEqual(first, later)
+        self.assertEqual(later[2], ["45.1.1.1"])
+
+    def test_recorded_time_wins_over_as_of(self):
+        saved = self.saved(scanned_at="2026-10-21T00:00:00+00:00")
+        self.assertEqual(self.rescore(saved, self.DAY2)[:2],
+                         self.rescore(saved, self.DAY2, undated_as_of=self.DAY2)[:2])
+
+    def test_new_scans_record_their_time(self):
+        from paradox import calibrate
+        with mock.patch.object(calibrate, "fetch_otx", return_value={}), mock.patch.object(
+                calibrate, "run_beacon", return_value=Signal("x", "x", "slow")):
+            self.assertIsNotNone(_sources.parse_dt(calibrate.scan_raw("45.1.1.1")["scanned_at"]))
 
 
 class ClaimTests(unittest.TestCase):
