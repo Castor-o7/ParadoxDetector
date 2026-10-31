@@ -305,9 +305,9 @@ first flag relative to the other beacons, across every IP that eventually got fl
 tiers from measured median lag, and report when a "slow" source turns out to be fast or the
 reverse. The paradox definition then rests on data.
 
-### 3.5 Adversarial test suite · M
+### 3.5 Adversarial test suite · M · ✅ shipped
 
-- [ ] **PDX-15: Adversarial test suite.** Done when: CI runs a test for smearing, laundering, dilution and label spoofing, and each pins how far the attack can move the score.
+- [x] **PDX-15: Adversarial test suite.** Done when: CI runs a test for smearing, laundering, dilution and label spoofing, and each pins how far the attack can move the score.
 
 Attack the scoring on purpose, with synthetic fixtures:
 
@@ -319,6 +319,19 @@ Attack the scoring on purpose, with synthetic fixtures:
 Each attack gets a test that pins down how far it can move the score. This turns the hardening
 we've done (one vote per author, quality discounts, independence) into guarantees that are
 checked on every PR.
+
+*Shipped:* `tests/test_adversarial.py` runs the real OTX parser, reverse DNS check and scorer on synthetic fixtures,
+with no network calls. "Guarantee" tests must keep holding, and "known weakness" tests pin attacks that work today.
+
+| Attack | With independent beacons | When OTX is the only witness |
+|---|---|---|
+| Smearing | One account gets one vote however many pulses it posts; old pulses fade | **Works:** 5 new accounts take a clean IP to paradox 60, Likely malicious; 10 reach 72, Malicious (PDX-38) |
+| Laundering | **Holds:** stays Malicious and fires a veneer | **Works:** OTX's own whitelist takes paradox 72, Malicious to 14, Suspicious, with no veneer (PDX-39) |
+| Dilution | **Holds:** stays Malicious, and padding can't weaken another author's pulse | **Works:** if every pulse is padded to 20,000 indicators, it reads Likely benign |
+| Label spoofing | **Holds:** a forged PTR earns no label and raises a veneer | A clean IP with a forged PTR reads paradox 15, Suspicious |
+
+*Limits:* these pin today's rules against attacks we thought of, on fixtures where the other beacons are set by hand.
+They don't show what a real attacker can do, whether OTX would catch sock puppets, or how often this happens.
 
 ### 3.6 Rescores that reproduce · S
 
@@ -339,6 +352,21 @@ any that quietly use those lists can't be detected.
 returned. No vendor is named blocklist.de. IPsum by its README, which describes an aggregator of 30+ public lists,
 and by measuring 88% of blocklist.de, 85% of CINS Army and 99% of ET compromised inside its feed. The list was fixed
 before any scores with it existed.
+
+### 3.8 Smearing by new OTX accounts · M
+
+- [ ] **PDX-38: Limit what new accounts can do to a clean IP.** Done when: the smearing test's numbers change, a rescore of the calibration IPs reports detection and benign flagged before and after, and every malicious IP that falls below Suspicious is named.
+
+The adversarial suite shows 5 new OTX accounts taking a clean IP to Likely malicious when no other beacon agrees.
+Requiring corroboration before OTX alone can reach that label is one candidate, and its cost is the very early warning
+this project exists for. Measure that before choosing. Whether OTX exposes anything about account age is unchecked.
+
+### 3.9 OTX's whitelist clearing its own evidence · S
+
+- [ ] **PDX-39: OTX's whitelist can't clear OTX-only evidence silently.** Done when: the laundering test's numbers change or the report plainly says OTX's evidence was discounted by OTX's own whitelist, and a rescore reports the effect on the benign IPs that discount was built for.
+
+The discount exists because malware contacting a DNS resolver fills OTX with noise, and OTX's whitelist is a fair sign
+of that. The same rule lets an attacker on that whitelist drop from Malicious to Suspicious with no veneer.
 
 ---
 
@@ -551,7 +579,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 3.1, 3.5, 3.6, 4.1, ~~4.6, 4.7, 4.8, 4.9, 4.10, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.6, 3.8, 3.9, 4.1, ~~3.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, ~~4.3, 4.4~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 

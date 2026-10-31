@@ -60,8 +60,11 @@ forge a reverse DNS name.
 
 **Open:**
 
-- How far each attack can move a score isn't measured. That's [PDX-15](ROADMAP.md#35-adversarial-test-suite--m), and
-  until it's built the protections above are untested as defenses.
+- `tests/test_adversarial.py` pins how far each attack moves a score. With independent beacons, laundering, padding and
+  a forged PTR don't clear a malicious IP. But when OTX is the only witness, [5 new accounts can take a clean IP to
+  Likely malicious](ROADMAP.md#38-smearing-by-new-otx-accounts--m), [OTX's own whitelist can clear real
+  evidence](ROADMAP.md#39-otxs-whitelist-clearing-its-own-evidence--s), and padding every pulse hides it.
+- Those tests use synthetic fixtures and attacks we thought of, so they don't show what a real attacker can do.
 - One-vendor scaling has a cost: an attacker known to exactly one vendor and nothing else can read as Likely benign.
 - Independence between VirusTotal's vendors can't be shown, because their sources are closed.
 
