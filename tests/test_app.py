@@ -109,6 +109,35 @@ class WatcherTests(unittest.TestCase):
         self.assertIn("PARADOX 45.1.1.1", alerts[0]["text"])
         self.assertEqual(w.seen["45.1.1.1"]["hits"], 3)
 
+    def test_new_ip_cap_stops_a_flood_and_recovers(self):
+        w, _, _ = self.watcher({}, max_new_per_hour=3)
+        with mock.patch("paradox.watch.time.time", return_value=1_800_000_000.0) as clock, \
+                mock.patch("sys.stderr", io.StringIO()) as err:
+            for i in range(1, 101):
+                w.feed(f"forged 45.1.1.{i}", "x")
+            self.assertEqual(w.q.qsize(), 3)
+            self.assertEqual(w.stats["capped"], 97)
+            self.assertEqual(err.getvalue().count("the limit"), 1)
+            clock.return_value = 1_800_000_000.0 + 3599
+            w.feed("real 45.1.1.50", "x")
+            self.assertEqual(w.q.qsize(), 3)                  # still inside the hour
+            clock.return_value = 1_800_000_000.0 + 3600
+            w.feed("real 45.1.1.50", "x")                     # seen again later: gets its turn
+            self.assertEqual(w.q.qsize(), 4)
+            self.assertIn("45.1.1.50", w.pending)
+
+    def test_new_ip_cap_doesnt_count_or_block_rescans(self):
+        w, _, _ = self.watcher({}, max_new_per_hour=1, rescan_after_h=0)
+        w.last_scan.update({"45.1.1.1": 0.0, "45.1.1.2": 0.0})
+        w.feed("45.1.1.1 45.1.1.2", "x")
+        self.assertEqual((w.q.qsize(), w.stats["capped"], len(w.new_scans)), (2, 0, 0))
+
+    def test_new_ip_cap_of_zero_is_off(self):
+        w, _, _ = self.watcher({}, max_new_per_hour=0)
+        for i in range(1, 51):
+            w.feed(f"45.1.1.{i}", "x")
+        self.assertEqual((w.q.qsize(), w.stats["capped"]), (50, 0))
+
     def test_min_hits_and_flag_change_alerts(self):
         scores = {"45.1.1.1": fake_score(paradox=50, threat=0.5)}
         w, calls, out = self.watcher(scores, min_hits=2)
