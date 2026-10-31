@@ -21,6 +21,21 @@ it was tested, and which beacons didn't answer.
 Use it as a web app, a CLI, a batch log scanner, a headless log watcher or an MCP server for AI assistants.
 Where it's headed: [ROADMAP.md](ROADMAP.md), on unmasking borrowed legitimacy.
 
+## Status and known limits
+
+This is a working beta: a triage aid for an analyst to check, not something to act on without a person. Today:
+
+- **Accuracy rests on a small set.** Calibration uses 55 labeled IPs. Most paradoxes on known-malicious IPs fall away
+  once VirusTotal is on, as [the note on the results](#calibration) explains.
+- **Evidence from OTX alone can be gamed.** In synthetic tests, 5 new OTX accounts take a clean IP to Likely malicious,
+  and OTX's own whitelist or padded pulses can hide real OTX evidence. Independent beacons hold up against the same
+  attacks. See [the adversarial results](ROADMAP.md#35-adversarial-test-suite--m).
+- **Not yet tested:** use by real analysts, prompt injection against the summary, and attackers hiding on CDNs, cloud
+  hosts or Tor.
+- **VirusTotal's free tier** rules out commercial use, and its limits make a 25-IP scan take at least 6 minutes.
+
+The threat model and its open gaps are in [SECURITY.md](SECURITY.md).
+
 ## Install
 
 ```bash
@@ -469,6 +484,7 @@ paradox/cli.py        the `paradox` command: app + headless subcommands
 paradox/sources.py    beacon adapters -> Signal
 paradox/scoring.py    tier scores, paradox, threat
 paradox/engine.py     concurrent scan + caching
+paradox/quota.py      keeps VirusTotal inside its free limits
 paradox/history.py    SQLite scan history + lag measurement
 paradox/logscan.py    batch mode: extract IPs from logs, scan, rank
 paradox/watch.py      headless sensor: follow logs, alert, periodic rescans

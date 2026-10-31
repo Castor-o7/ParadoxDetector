@@ -24,13 +24,14 @@ Effort: **S** is about a day, **M** a few days, **L** a week or more.
 
 Each item has a permanent story ID (`PDX-n`) and a "done when" line for the
 [Muster board](https://github.com/Castor-o7/muster/blob/main/docs/board.md). A checked box means shipped, not verified.
-The watchman keeps each story's state.
+The watchman keeps each story's state. **Progress: 21 of 40 stories shipped (52%),** counting each story the same
+whatever its size, and the total grows as work finds new stories.
 
 ---
 
 ## Where we stand
 
-What the 2026-10-29 calibration (run 5) and the live tests showed, which sets the priorities below. A ✅ marks a shipped fix; the rescore after 1.1, 1.2 and 3.2 is in the README:
+What the 2026-10-29 calibration (run 5), the live tests and later measurements showed, which sets the priorities below. A ✅ marks a shipped fix; the rescore after 1.1, 1.2 and 3.2 is in the README:
 
 | Finding | Evidence | Addressed by |
 |---|---|---|
@@ -40,6 +41,8 @@ What the 2026-10-29 calibration (run 5) and the live tests showed, which sets th
 | Blocklists used as labels include research scanners | Shodan and Palo Alto Xpanse IPs were in the "malicious" set | 3.2 ✅ |
 | We assume which beacons are fast and slow, and never measured it | Tiers are hard-coded in `BEACONS` | 3.4 |
 | Veneer has no ground truth, so we can't state its precision | No labeled veneer cases exist | 3.3 |
+| Evidence from OTX alone can be gamed | Synthetic attacks: 5 new accounts take a clean IP to Likely malicious; OTX's whitelist or padding can hide real evidence | 3.5 ✅ measured; 3.8, 3.9, 3.10 to fix |
+| Most paradoxes on malicious IPs reflected the missing VirusTotal key | With it on, malicious at paradox 35+ fell from 28 to 4 of 30 | Open: how to frame the score |
 
 ---
 
