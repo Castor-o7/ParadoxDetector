@@ -122,15 +122,15 @@ the web app.
 
 **What's in place:**
 
-- `paradox init` creates it with mode 600.
+- `paradox init` creates it with mode 600, and loading a file that others can read prints a warning with the fix.
 - It's in `.gitignore` and `.dockerignore`, so it stays out of commits and images. Compose passes it at runtime.
 - Status output reports whether a key is set, never its value.
 - `scan_log` can't read it by default, because the working folder isn't allowed.
 
 **Open:**
 
-- Copying `env.example` by hand, as the Docker steps do, keeps the default permissions. Run `chmod 600 .env`.
-- The file isn't checked for loose permissions when it's loaded.
+- A loose `.env` only gets a warning on stderr. It still loads, so a keys file others can read keeps working.
+- Windows has no such check, and a container's `env_file` is read by Docker, not this check.
 - Keys are held in plain text and in the process environment.
 - A key pasted into a chat or an AI session should be treated as exposed and rotated.
 
