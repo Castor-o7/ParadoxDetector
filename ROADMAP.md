@@ -422,9 +422,9 @@ third party.
 
 The URL works like a password for its channel, and on the command line it shows up in process listings and shell history.
 
-### 4.9 Refuse unencrypted webhooks · S
+### 4.9 Refuse unencrypted webhooks · S · ✅ shipped
 
-- [ ] **PDX-36: Refuse `http://` webhooks.** Done when: the watcher refuses to start with a non-HTTPS webhook unless it points at loopback or an explicit override is set, with tests for each case.
+- [x] **PDX-36: Refuse `http://` webhooks.** Done when: the watcher refuses to start with a non-HTTPS webhook unless it points at loopback or an explicit override is set, with tests for each case.
 
 ### 4.10 Warn about a loose `.env` · S
 
@@ -551,7 +551,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 3.1, 3.5, 3.6, 4.1, 4.9, 4.10, ~~4.6, 4.7, 4.8, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.5, 3.6, 4.1, 4.10, ~~4.6, 4.7, 4.8, 4.9, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, ~~4.3, 4.4~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 

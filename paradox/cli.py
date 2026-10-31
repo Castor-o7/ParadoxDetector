@@ -179,14 +179,18 @@ def cmd_log(args) -> int:
 
 
 def cmd_watch(args) -> int:
-    from .watch import Watcher
+    from .watch import Watcher, webhook_problem
     alert_on = [f.strip() for f in args.alert_on.split(",") if f.strip()]
     bad = set(alert_on) - {"veneer", "paradox", "threat", "watch"}
     if bad:
         print(f"error: unknown --alert-on flag(s): {', '.join(sorted(bad))}", file=sys.stderr)
         return 2
+    webhook = args.webhook or config.key("PARADOX_WEBHOOK")
+    if webhook and (problem := webhook_problem(webhook)):
+        print(f"error: {problem}", file=sys.stderr)
+        return 2
     w = Watcher(min_hits=args.min_hits, rescan_after_h=args.rescan_after, alert_on=alert_on,
-                workers=args.workers, webhook=args.webhook or config.key("PARADOX_WEBHOOK"), as_json=args.json, max_new_per_hour=args.max_new_per_hour)
+                workers=args.workers, webhook=webhook, as_json=args.json, max_new_per_hour=args.max_new_per_hour)
     return w.run(args.log or [], from_start=args.from_start, rescan_every_h=args.rescan_every)
 
 

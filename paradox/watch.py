@@ -27,8 +27,10 @@ import urllib.request
 from collections import deque
 from datetime import datetime, timezone
 from typing import Callable, Iterator, TextIO
+from urllib.parse import urlsplit
 
 from . import engine, history, logscan
+from .server import is_loopback
 
 DEFAULT_ALERTS = ("veneer", "paradox", "threat")
 DEFAULT_MAX_NEW = 15    # new IPs scanned an hour: 360 a day, inside VirusTotal's 500 with room for rescans
@@ -98,6 +100,18 @@ def stream(src: TextIO, stop: threading.Event) -> Iterator[str]:
         if stop.is_set():
             break
         yield line
+
+
+def webhook_problem(url: str) -> str | None:
+    """Why this URL can't be used, or None. Never quotes the URL, which works like a password."""
+    parts = urlsplit(url)
+    if parts.scheme == "https" and parts.hostname:
+        return None
+    if parts.scheme != "http" or not parts.hostname:
+        return "the webhook must be an https:// URL"
+    if is_loopback(parts.hostname) or os.environ.get("PARADOX_WEBHOOK_ALLOW_HTTP") == "1":
+        return None
+    return "the webhook is http://, which would send alerts unencrypted; use https://, or set PARADOX_WEBHOOK_ALLOW_HTTP=1"
 
 
 class Watcher:

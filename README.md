@@ -84,7 +84,8 @@ flood can delay or hide a real attacker that appears only once. The limit resets
 An alert fires when an IP's flag enters the alert set (`--alert-on`, default
 `veneer,paradox,threat`) or changes, not on every sighting. Alerts go to stdout (one JSON object
 per line with `--json`) and, with a webhook, are POSTed as JSON. Set the URL as `PARADOX_WEBHOOK`, in `.env` for instance: it works like a
-password for its channel, and `--webhook` puts it in process listings and shell history. `--webhook` wins if both are set. The payload's `text` field works
+password for its channel, and `--webhook` puts it in process listings and shell history. `--webhook` wins if both are set. It must be `https://`, or `http://` on
+loopback; `PARADOX_WEBHOOK_ALLOW_HTTP=1` allows other `http://` URLs, for a trusted network. The payload's `text` field works
 as-is with Slack and Mattermost incoming webhooks. Log lines are untrusted and can hold private
 details, so the `sample` line appears only in `--json` stdout, never in `text` or a webhook post. `docker stop` and Ctrl+C shut it down cleanly. It exits 1 if anything alerted.
 
