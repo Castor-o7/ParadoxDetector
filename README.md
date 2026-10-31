@@ -84,9 +84,8 @@ flood can delay or hide a real attacker that appears only once. The limit resets
 An alert fires when an IP's flag enters the alert set (`--alert-on`, default
 `veneer,paradox,threat`) or changes, not on every sighting. Alerts go to stdout (one JSON object
 per line with `--json`) and, with `--webhook`, are POSTed as JSON. The payload's `text` field works
-as-is with Slack and Mattermost incoming webhooks. Log lines are untrusted, so
-the attacker-written `sample` line is kept out of `text` and only appears in the JSON `alert`
-object. `docker stop` and Ctrl+C shut it down cleanly. It exits 1 if anything alerted.
+as-is with Slack and Mattermost incoming webhooks. Log lines are untrusted and can hold private
+details, so the `sample` line appears only in `--json` stdout, never in `text` or a webhook post. `docker stop` and Ctrl+C shut it down cleanly. It exits 1 if anything alerted.
 
 Developing: `python3 -m unittest discover -s tests` (no keys or network needed).
 

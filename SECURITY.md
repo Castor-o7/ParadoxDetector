@@ -100,15 +100,13 @@ more than people expect.
 
 **What's in place:**
 
-- The Slack-compatible `text` field holds only the flag, IP, scores and verdict. The attacker-written `sample` log line
-  is kept out of it.
+- The Slack-compatible `text` field holds only the flag, IP, scores and verdict. The raw `sample` log line is removed
+  from everything posted, and appears only in `--json` stdout on your own machine.
 - Webhooks are opt-in, and a failed post is reported on stderr without stopping the watcher.
 
 **Open:**
 
-- The JSON `alert` object does include `sample`, the raw log line (up to 300 characters), along with hit counts. A log
-  line can hold usernames, internal hostnames or tokens, and any receiver that stores the whole payload gets it. Slack
-  and Mattermost use `text`, but they still receive the rest.
+- A post still says which IPs were seen, how often, and the log's path (`source`), and the receiver can store all of it.
 - `text` can quote a third-party label in the verdict, so a chat channel or bot reading it sees attacker-influenced text.
 - The URL is passed on the command line, so it's visible in process listings and shell history. It's effectively a
   password for that channel.
