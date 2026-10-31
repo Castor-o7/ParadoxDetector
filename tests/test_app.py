@@ -109,6 +109,26 @@ class WatcherTests(unittest.TestCase):
         self.assertIn("PARADOX 45.1.1.1", alerts[0]["text"])
         self.assertEqual(w.seen["45.1.1.1"]["hits"], 3)
 
+    def test_webhook_gets_no_log_line_but_stdout_keeps_it(self):
+        w, _, out = self.watcher({"45.1.1.1": fake_score(paradox=50, threat=0.5)}, webhook="https://example.test/x")
+        w.feed("Failed password for token-s3cret from 45.1.1.1", "auth.log")
+        posted, sent = [], threading.Event()
+
+        def urlopen(req, timeout=None):
+            posted.append(req.data.decode())
+            sent.set()
+            return mock.MagicMock()
+
+        with mock.patch("urllib.request.urlopen", urlopen):
+            w.check(w.q.get())
+            self.assertTrue(sent.wait(5))
+        self.assertNotIn("s3cret", posted[0])
+        body = json.loads(posted[0])
+        self.assertNotIn("sample", body["alert"])
+        self.assertEqual(body["alert"]["ip"], "45.1.1.1")
+        self.assertIn("PARADOX 45.1.1.1", body["text"])
+        self.assertIn("s3cret", json.loads(out.getvalue())["alert"]["sample"])
+
     def test_new_ip_cap_stops_a_flood_and_recovers(self):
         w, _, _ = self.watcher({}, max_new_per_hour=3)
         with mock.patch("paradox.watch.time.time", return_value=1_800_000_000.0) as clock, \

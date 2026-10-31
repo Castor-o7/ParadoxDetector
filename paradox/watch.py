@@ -228,7 +228,9 @@ class Watcher:
         with self.lock:
             print(line, file=self.out, flush=True)
         if self.webhook:
-            threading.Thread(target=self._post, args=(payload,), daemon=True).start()
+            # A log line can hold usernames, hostnames or tokens, and this goes to a third party.
+            outbound = {**payload, "alert": {k: v for k, v in row.items() if k != "sample"}}
+            threading.Thread(target=self._post, args=(outbound,), daemon=True).start()
 
     def _post(self, payload: dict) -> None:
         req = urllib.request.Request(self.webhook, data=json.dumps(payload).encode(), method="POST",
