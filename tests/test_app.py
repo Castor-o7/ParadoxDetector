@@ -31,6 +31,19 @@ class LegacyCliTests(unittest.TestCase):
                      ["beacons"], ["init"], ["where"]):
             self.assertTrue(callable(p.parse_args(argv).func), argv)
 
+    def watch_webhook(self, *argv, env=None):
+        with mock.patch.dict(os.environ, env or {}), mock.patch.object(watch, "Watcher") as w:
+            os.environ.pop("PARADOX_WEBHOOK", None) if env is None else None
+            w.return_value.run.return_value = 0
+            cli.main(["watch", "--log", "a", *argv])
+        return w.call_args.kwargs["webhook"]
+
+    def test_webhook_url_comes_from_the_environment_and_the_flag_wins(self):
+        env = {"PARADOX_WEBHOOK": "https://example.test/env"}
+        self.assertEqual(self.watch_webhook(env=env), "https://example.test/env")
+        self.assertEqual(self.watch_webhook("--webhook", "https://example.test/flag", env=env), "https://example.test/flag")
+        self.assertIsNone(self.watch_webhook())
+
     def test_scan_exit_status_reflects_findings(self):
         def run(score):
             with mock.patch.object(cli, "scan", return_value={"ip": "45.1.1.1", "score": score}), \

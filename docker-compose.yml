@@ -13,7 +13,7 @@ services:
   # Headless sensor sharing the same history. It rescans tracked IPs every
   # 6 hours. To follow host logs too, mount them and add --log, e.g.
   #   volumes: [/var/log/auth.log:/logs/auth.log:ro]
-  #   command: [paradox, watch, --rescan-every, "6", --log, /logs/auth.log, --webhook, https://...]
+  #   command: [paradox, watch, --rescan-every, "6", --log, /logs/auth.log]   # set PARADOX_WEBHOOK in .env for alerts
   watch:
     build: .
     env_file: .env
