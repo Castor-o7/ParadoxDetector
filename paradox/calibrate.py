@@ -36,9 +36,10 @@ import sys
 import time
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 from . import config, scoring
-from .sources import (BEACONS, NEIGHBOR_LISTS, Signal, _drop_networks, _feodo_index, _ip_list,
+from .sources import (BEACONS, NEIGHBOR_LISTS, Signal, _drop_networks, _feodo_index, _ip_list, parse_dt,
                       apply_otx, fetch_otx, run_beacon, virustotal_confidence)
 
 DIR = config.DATA_DIR / "calibration"
@@ -103,16 +104,17 @@ def scan_raw(ip: str) -> dict:
     others = [b for b in BEACONS if b.id != "otx"]
     with ThreadPoolExecutor(max_workers=len(others)) as pool:
         signals = list(pool.map(lambda b: run_beacon(b, ip), others))
-    return {"signals": [s.to_dict() for s in signals], "otx_raw": otx_raw, "otx_error": otx_error}
+    return {"scanned_at": datetime.now(timezone.utc).isoformat(),
+            "signals": [s.to_dict() for s in signals], "otx_raw": otx_raw, "otx_error": otx_error}
 
 
-def build_signals(ip: str, saved: dict) -> list[Signal]:
+def build_signals(ip: str, saved: dict, as_of: datetime | None = None) -> list[Signal]:
     """Rebuild a scan's signals, re-scoring OTX from its raw response with the
-    current settings in sources.py."""
+    current settings in sources.py, aged to as_of."""
     otx = next(b for b in BEACONS if b.id == "otx")
     sig = Signal(source=otx.id, name=otx.name, tier=otx.tier)
     if saved.get("otx_raw") is not None:
-        apply_otx(ip, sig, saved["otx_raw"])
+        apply_otx(ip, sig, saved["otx_raw"], as_of)
     else:
         sig.status, sig.summary = "error", saved.get("otx_error") or "no OTX data"
     others = [Signal(**s) for s in saved["signals"]]
@@ -126,9 +128,14 @@ def build_signals(ip: str, saved: dict) -> list[Signal]:
     return [sig] + others
 
 
-def collect(ips: list[str], pause: float, offline: bool) -> dict[str, list[Signal]]:
+def collect(ips: list[str], pause: float, offline: bool,
+            undated_as_of: datetime | None = None) -> tuple[dict[str, list[Signal]], dict[str, datetime], list[str]]:
+    """The signals for each IP, when each scan counts as taken, and which scans have no
+    recorded time. Those use undated_as_of, or are left to age against today."""
     SCANS.mkdir(parents=True, exist_ok=True)
     out = {}
+    times: dict[str, datetime] = {}
+    undated = []
     limited = 0
     for i, ip in enumerate(ips, 1):
         path = SCANS / f"{ip.replace(':', '_')}.json"
@@ -153,8 +160,14 @@ def collect(ips: list[str], pause: float, offline: bool) -> dict[str, list[Signa
             limited = 0
             path.write_text(json.dumps(saved))
             time.sleep(pause)
-        out[ip] = build_signals(ip, saved)
-    return out
+        as_of = parse_dt(saved.get("scanned_at"))
+        if as_of is None:
+            undated.append(ip)
+            as_of = undated_as_of
+        if as_of is not None:
+            times[ip] = as_of
+        out[ip] = build_signals(ip, saved, as_of)
+    return out, times, undated
 
 
 def refresh(ips: list[str], beacon_ids: list[str], pause: float) -> None:
@@ -170,6 +183,7 @@ def refresh(ips: list[str], beacon_ids: list[str], pause: float) -> None:
             new = run_beacon(b, ip)
             if new.status == "ok":   # replace the saved reading, or add a beacon newer than the scan
                 saved["signals"] = [s for s in saved["signals"] if s["source"] != b.id] + [new.to_dict()]
+                saved["scanned_at"] = datetime.now(timezone.utc).isoformat()   # its newest reading mustn't be future-dated
             else:
                 print(f"  {ip}: {b.id} {new.status}, keeping saved reading", file=sys.stderr)
         path.write_text(json.dumps(saved))
@@ -185,12 +199,12 @@ def auc(pos: list[float], neg: list[float]) -> float | None:
     return wins / (len(pos) * len(neg))
 
 
-def evaluate(labels: dict, scans: dict[str, list[Signal]]) -> dict:
+def evaluate(labels: dict, scans: dict[str, list[Signal]], times: dict[str, datetime] | None = None) -> dict:
     rows = []
     for cls in ("malicious", "benign"):
         for ip in labels[cls]:
             if ip in scans:
-                sc = scoring.compute(scans[ip])
+                sc = scoring.compute(scans[ip], now=(times or {}).get(ip))
                 scanner_by = sorted({s.name for s in scans[ip]
                                      if s.status == "ok" and s.facts.get("label_kind") == "scanner"})
                 rows.append({"ip": ip, "label": cls, "threat": sc["threat"], "paradox": sc["paradox"],
@@ -284,6 +298,13 @@ def render(ev: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def as_of_date(text: str) -> datetime:
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' isn't a YYYY-MM-DD date") from None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="paradox calibrate", description=__doc__.split("\n\n")[0])
     ap.add_argument("--rescore", action="store_true", help="score saved scans only; no API calls")
@@ -291,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--size", type=int, default=30, help="malicious sample size (default 30)")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--pause", type=float, default=1.5, help="seconds between live scans")
+    ap.add_argument("--as-of", type=as_of_date, metavar="YYYY-MM-DD",
+                    help="when to treat scans with no recorded time as taken (default: today, so results drift)")
     ap.add_argument("--refresh", nargs="+", metavar="BEACON", help="re-run only these beacon ids on saved scans")
     args = ap.parse_args(argv)
 
@@ -303,9 +326,15 @@ def main(argv: list[str] | None = None) -> int:
         if unknown:
             ap.error(f"unknown beacon id(s): {', '.join(sorted(unknown))} (OTX is re-scored with --rescore)")
         refresh(labels["malicious"] + labels["benign"], args.refresh, args.pause)
-    scans = collect(labels["malicious"] + labels["benign"], args.pause, offline=args.rescore or bool(args.refresh))
-    ev = evaluate(labels, scans)
+    scans, times, undated = collect(labels["malicious"] + labels["benign"], args.pause,
+                                    offline=args.rescore or bool(args.refresh), undated_as_of=args.as_of)
+    ev = evaluate(labels, scans, times)
+    ev["undated_scans"] = {"ips": undated, "as_of": args.as_of.date().isoformat() if args.as_of else "today"}
     print(render(ev))
+    if undated:
+        print(f"  {len(undated)} of {len(scans)} scans have no recorded time, so they were aged as of "
+              f"{ev['undated_scans']['as_of']}."
+              + ("" if args.as_of else " These results change with the day; use --as-of to fix them.") + "\n")
     (DIR / "report.json").write_text(json.dumps(ev, indent=1, default=str))
     return 0
 

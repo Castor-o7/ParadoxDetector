@@ -24,7 +24,7 @@ Effort: **S** is about a day, **M** a few days, **L** a week or more.
 
 Each item has a permanent story ID (`PDX-n`) and a "done when" line for the
 [Muster board](https://github.com/Castor-o7/muster/blob/main/docs/board.md). A checked box means shipped, not verified.
-The watchman keeps each story's state. **Progress: 21 of 40 stories shipped (52%),** counting each story the same
+The watchman keeps each story's state. **Progress: 22 of 40 stories shipped (55%),** counting each story the same
 whatever its size, and the total grows as work finds new stories.
 
 ---
@@ -336,9 +336,9 @@ with no network calls. "Guarantee" tests must keep holding, and "known weakness"
 *Limits:* these pin today's rules against attacks we thought of, on fixtures where the other beacons are set by hand.
 They don't show what a real attacker can do, whether OTX would catch sock puppets, or how often this happens.
 
-### 3.6 Rescores that reproduce · S
+### 3.6 Rescores that reproduce · S · ✅ shipped
 
-- [ ] **PDX-28: Score saved scans as of when they were taken.** Done when: `paradox calibrate --rescore` ages each saved scan against its recorded scan time, scans without one say so in the report, and a test shows the same saved scan gets the same score on different days.
+- [x] **PDX-28: Score saved scans as of when they were taken.** Done when: `paradox calibrate --rescore` ages each saved scan against its recorded scan time, scans without one say so in the report, and a test shows the same saved scan gets the same score on different days.
 
 Saved scans are aged against today's date, so recency rules such as 1.6's window and the veneer's freshness check
 give different results depending on the day of the rescore, and a past result can't be reproduced.
@@ -589,7 +589,7 @@ and fix the top issues. Repeat after 5.6. It also doubles as class material.
 | When | Items | Why first |
 |---|---|---|
 | Now | ~~1.1, 1.2, 1.5, 3.2, 5.1~~ (done) | Small, keyless, and fix the biggest measured weakness (the scanner rule's dependence on GreyNoise); 5.1 makes that dependence visible |
-| Next | 1.3, 3.1, 3.6, 3.8, 3.9, 3.10, 4.1, ~~3.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
+| Next | 1.3, 3.1, 3.8, 3.9, 3.10, 4.1, ~~3.6, 3.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.5, 1.7, 1.8, 3.7, 1.4, 1.6, 5.2, 5.4~~ (done) | Close the known false positives, build adversarial and hiding-place test sets, test the AI summarizer under attack, and show watch state and claim checks in the UI |
 | Then | 2.1, 2.3, 3.3, 3.4, 4.2, ~~4.3, 4.4~~ (done), 5.3, 5.5–5.7 | New unmasking signals plus self-measurement once history has accumulated, with the UI restructured to hold them |
 | Later | 2.2, 2.4, 2.5 | Bigger extensions: domains, campaigns, more beacons |
 

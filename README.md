@@ -216,7 +216,9 @@ GreyNoise), both `explained`. The other 28 malicious IPs: AUC 1.000, detection 1
 With it on, both scanners read as `veneer` instead (see the note below).
 
 Raw OTX responses are saved, so OTX settings (`OTX_*` in `paradox/sources.py`) and the scoring weights
-can be re-tested offline with `--rescore`, with no API calls. `--refresh <beacon ...>` re-runs
+can be re-tested offline with `--rescore`, with no API calls. Each scan is aged as of when it was taken, so a
+rescore gives the same result on any day. Scans saved before that was recorded are listed in the report and age
+against today unless `--as-of YYYY-MM-DD` says otherwise. `--refresh <beacon ...>` re-runs
 just those beacons on the saved scans, keeping the old reading wherever a call fails. If OTX starts rate-limiting, the run
 stops early and fills in the gaps next time.
 

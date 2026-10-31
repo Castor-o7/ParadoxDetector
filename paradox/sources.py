@@ -306,10 +306,10 @@ def otx_scan_share(data: dict) -> float | None:
     return round(scan / (scan + attack), 3) if scan + attack else None
 
 
-def apply_otx(ip: str, sig: Signal, data: dict) -> None:
+def apply_otx(ip: str, sig: Signal, data: dict, now: datetime | None = None) -> None:
     """Fill an OTX signal from a raw response (separate so calibration can
-    re-score saved responses offline)."""
-    s = score_otx(data)
+    re-score saved responses offline, as of when they were taken)."""
+    s = score_otx(data, now)
     sig.threat, sig.confidence = s["threat"], s["confidence"]
     sig.last_seen = iso_date(s["newest"])
     sig.link = f"https://otx.alienvault.com/indicator/ip/{ip}"
