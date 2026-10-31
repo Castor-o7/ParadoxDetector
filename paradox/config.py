@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent
 ROOT = PACKAGE.parent
+POSIX_MODES = os.name == "posix"    # Windows reports made-up modes
 
 
 def _home() -> Path:
@@ -28,10 +30,22 @@ CACHE_DIR = HOME / ".cache"
 ENV_FILE = HOME / ".env"
 
 
+def warn_if_exposed(path: Path) -> None:
+    """A keys file others can read gives away every API key and the web password."""
+    if not POSIX_MODES:
+        return
+    try:
+        if path.stat().st_mode & 0o077:
+            print(f"warning: {path} can be read by other users; fix it with: chmod 600 {path}", file=sys.stderr)
+    except OSError:
+        pass
+
+
 def load_dotenv(path: Path = ENV_FILE) -> None:
     """Load KEY=VALUE lines into os.environ without overriding existing vars."""
     if not path.exists():
         return
+    warn_if_exposed(path)
     for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:

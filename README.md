@@ -412,6 +412,7 @@ API quotas (and Anthropic credits, if narratives are on), so it has guards:
 
 ```bash
 cp paradox/env.example .env   # add keys and PARADOX_PASSWORD
+chmod 600 .env
 docker compose up -d --build
 docker compose run --rm web paradox scan 45.155.205.233 --json   # any headless command
 ```
