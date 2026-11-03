@@ -21,20 +21,8 @@ it was tested, and which beacons didn't answer.
 Use it as a web app, a CLI, a batch log scanner, a headless log watcher or an MCP server for AI assistants.
 Where it's headed: [ROADMAP.md](ROADMAP.md), on unmasking borrowed legitimacy.
 
-## Status and known limits
-
-This is a working beta: a triage aid for an analyst to check, not something to act on without a person. Today:
-
-- **Accuracy rests on a small set.** Calibration uses 55 labeled IPs. Most paradoxes on known-malicious IPs fall away
-  once VirusTotal is on, as [the note on the results](#calibration) explains.
-- **Evidence from OTX alone can be gamed.** In synthetic tests, 5 new OTX accounts take a clean IP to Likely malicious,
-  and OTX's own whitelist or padded pulses can hide real OTX evidence. Independent beacons hold up against the same
-  attacks. See [the adversarial results](ROADMAP.md#35-adversarial-test-suite--m).
-- **Not yet tested:** use by real analysts, prompt injection against the summary, and attackers hiding on CDNs, cloud
-  hosts or Tor.
-- **VirusTotal's free tier** rules out commercial use, and its limits make a 25-IP scan take at least 6 minutes.
-
-The threat model and its open gaps are in [SECURITY.md](SECURITY.md).
+It's a triage aid for an analyst to check, not something to act on without a person. What's been
+checked so far, and what's next, is under [Status](#status).
 
 ## Install
 
@@ -478,6 +466,32 @@ To run the published image instead of building: `docker pull ghcr.io/castor-o7/p
 `pip install anthropic`, then set `ANTHROPIC_API_KEY`. The web UI's **Generate with Claude** button and
 `--narrate` in the CLI send the scored report to Claude (`claude-opus-5-5` by default), which writes a
 short verdict, explains why the beacons disagree, and recommends next steps.
+
+## Status
+
+A working beta, with CI on every change. 22 of the 40 stories in [ROADMAP.md](ROADMAP.md) are shipped.
+What the numbers rest on today:
+
+- **Calibration uses 55 labeled IPs.** Most paradoxes on known-malicious IPs fall away once VirusTotal
+  is on, as [the note on the results](#calibration) explains. A calibration set for CDN-hosted
+  phishing, cloud C2 and Tor exits is next ([3.1](ROADMAP.md#31-a-calibration-set-for-hiding-places--m)).
+- **The adversarial suite measures how evidence from OTX alone can be gamed.** In synthetic tests,
+  5 new OTX accounts take a clean IP to Likely malicious, and OTX's own whitelist or padded pulses can
+  hide real OTX evidence. Independent beacons hold up against the same attacks. See [the adversarial
+  results](ROADMAP.md#35-adversarial-test-suite--m---shipped). The fixes are next:
+  [3.8](ROADMAP.md#38-smearing-by-new-otx-accounts--m),
+  [3.9](ROADMAP.md#39-otxs-whitelist-clearing-its-own-evidence--s) and
+  [3.10](ROADMAP.md#310-padded-pulses-hiding-otx-only-evidence--s).
+- **VirusTotal's free tier** rules out commercial use, and its limits make a 25-IP scan take at least
+  6 minutes ([VirusTotal's free limits](#virustotals-free-limits)).
+
+Next to test:
+
+- Use by real analysts ([5.7](ROADMAP.md#57-usability-check-with-real-analysts--s)).
+- Prompt injection against the analyst summary ([4.1](ROADMAP.md#41-prompt-injection-evaluation-for-the-analyst-summary--m)).
+- Attackers hiding on CDNs, cloud hosts or Tor ([2.3](ROADMAP.md#23-hiding-behind-someone-elses-infrastructure--m)).
+
+The threat model and its open gaps are in [SECURITY.md](SECURITY.md).
 
 ## Layout
 
